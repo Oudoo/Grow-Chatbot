@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type {
   Bot,
@@ -10,7 +11,7 @@ import type {
   Sentiment,
 } from "@/lib/types";
 import { useLang } from "@/components/LanguageProvider";
-import { IconBack } from "@/components/icons";
+import { IconBack, IconSend } from "@/components/icons";
 import { formatDateTime } from "@/lib/format";
 
 const SENTIMENT_TONE: Record<Sentiment, string> = {
@@ -31,10 +32,12 @@ export function ConversationThread({
   bot: Bot | null;
 }) {
   const { t } = useLang();
-  const [status, setStatus] = useState<ConversationStatus>(
-    conversation.status,
-  );
+  const router = useRouter();
+  const [status, setStatus] = useState<ConversationStatus>(conversation.status);
+  const [agentInput, setAgentInput] = useState("");
+  const [sending, setSending] = useState(false);
   const msgDir = bot?.language === "ar" ? "rtl" : "ltr";
+  const toolLabels = t.tools.labels as Record<string, string>;
 
   async function changeStatus(next: ConversationStatus) {
     setStatus(next);
@@ -43,6 +46,24 @@ export function ConversationThread({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ status: next }),
     });
+    router.refresh();
+  }
+
+  async function sendAgentReply() {
+    const content = agentInput.trim();
+    if (!content || sending) return;
+    setSending(true);
+    try {
+      await fetch(`/api/conversations/${conversation.id}/reply`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ content }),
+      });
+      setAgentInput("");
+      router.refresh();
+    } finally {
+      setSending(false);
+    }
   }
 
   return (
@@ -57,9 +78,7 @@ export function ConversationThread({
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4">
         <div>
-          <div className="font-semibold text-slate-900">
-            {bot?.name ?? "—"}
-          </div>
+          <div className="font-semibold text-slate-900">{bot?.name ?? "—"}</div>
           <div className="text-xs text-slate-400">
             {t.channels[conversation.channel as keyof typeof t.channels] ??
               conversation.channel}{" "}
@@ -95,7 +114,9 @@ export function ConversationThread({
                   className={`whitespace-pre-wrap rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                     m.role === "user"
                       ? "bg-brand-600 text-white"
-                      : "bg-white text-slate-800 ring-1 ring-slate-100"
+                      : m.byAgent
+                        ? "bg-indigo-600 text-white"
+                        : "bg-white text-slate-800 ring-1 ring-slate-100"
                   }`}
                 >
                   {m.content}
@@ -108,15 +129,24 @@ export function ConversationThread({
                         title={inv.result}
                         className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700"
                       >
-                        🔧{" "}
-                        {(t.tools.labels as Record<string, string>)[inv.name] ??
-                          inv.name}
+                        🔧 {toolLabels[inv.name] ?? inv.name}
                       </span>
                     ))}
                   </div>
                 )}
                 <div className="mt-1 flex flex-wrap items-center gap-2 px-1 text-[11px] text-slate-400">
                   <span>{formatDateTime(m.createdAt)}</span>
+                  {m.role === "assistant" && (
+                    <span
+                      className={`rounded px-1.5 py-0.5 ${
+                        m.byAgent
+                          ? "bg-indigo-50 text-indigo-700"
+                          : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {m.byAgent ? t.handoff.badgeAgent : t.handoff.badgeBot}
+                    </span>
+                  )}
                   {m.role === "user" && m.sentiment && (
                     <span
                       className={`rounded px-1.5 py-0.5 ${SENTIMENT_TONE[m.sentiment]}`}
@@ -124,16 +154,42 @@ export function ConversationThread({
                       {t.sentiment[m.sentiment]}
                     </span>
                   )}
-                  {m.role === "assistant" && m.meta && (
-                    <span>
-                      {t.playground.via} {m.meta.provider} · {m.meta.model}
-                    </span>
-                  )}
                 </div>
               </div>
             </div>
           ))}
       </div>
+
+      {/* Human agent takeover composer (shown while handed off) */}
+      {status === "handoff" && (
+        <div className="mt-4 rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4">
+          <p className="mb-2 text-xs font-medium text-indigo-700">
+            {t.handoff.active}
+          </p>
+          <div className="flex items-center gap-2" dir={msgDir}>
+            <input
+              value={agentInput}
+              onChange={(e) => setAgentInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendAgentReply();
+                }
+              }}
+              placeholder={t.handoff.composer}
+              className="flex-1 rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-indigo-400"
+            />
+            <button
+              onClick={sendAgentReply}
+              disabled={sending || !agentInput.trim()}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-40"
+            >
+              <IconSend className="h-4 w-4" />
+              {t.handoff.send}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

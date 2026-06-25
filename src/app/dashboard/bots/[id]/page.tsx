@@ -15,7 +15,7 @@ export default function EditBotPage({ params }: { params: { id: string } }) {
       bot={bot}
       providers={providerCatalog()}
       defaultProvider={globalDefaultProvider()}
-      availableTools={toolNames()}
+      availableTools={toolNames(bot.tenantId)}
     />
   );
 }

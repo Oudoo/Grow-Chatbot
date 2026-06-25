@@ -4,6 +4,7 @@ import path from "path";
 import type {
   Bot,
   Conversation,
+  CustomTool,
   Database,
   Message,
   Sentiment,
@@ -30,6 +31,7 @@ const EMPTY_DB: Database = {
   conversations: [],
   messages: [],
   tickets: [],
+  customTools: [],
 };
 
 function ensureFile(): void {
@@ -50,6 +52,7 @@ export function readDb(): Database {
       conversations: parsed.conversations ?? [],
       messages: parsed.messages ?? [],
       tickets: parsed.tickets ?? [],
+      customTools: parsed.customTools ?? [],
     };
   } catch {
     return { ...EMPTY_DB };
@@ -245,6 +248,35 @@ export function createTicket(data: {
 export function listTickets(tenantId?: string): Ticket[] {
   const tickets = readDb().tickets;
   return tenantId ? tickets.filter((t) => t.tenantId === tenantId) : tickets;
+}
+
+// --- Custom (user-defined HTTP) tools --------------------------------------
+
+export type NewCustomTool = Omit<CustomTool, "id" | "createdAt">;
+
+export function listCustomTools(tenantId?: string): CustomTool[] {
+  const tools = readDb().customTools;
+  return tenantId ? tools.filter((t) => t.tenantId === tenantId) : tools;
+}
+
+export function getCustomTool(id: string): CustomTool | undefined {
+  return readDb().customTools.find((t) => t.id === id);
+}
+
+export function createCustomTool(data: NewCustomTool): CustomTool {
+  const db = readDb();
+  const tool: CustomTool = { ...data, id: newId(), createdAt: now() };
+  db.customTools.push(tool);
+  writeDb(db);
+  return tool;
+}
+
+export function deleteCustomTool(id: string): boolean {
+  const db = readDb();
+  const before = db.customTools.length;
+  db.customTools = db.customTools.filter((t) => t.id !== id);
+  writeDb(db);
+  return db.customTools.length < before;
 }
 
 // --- Stats -----------------------------------------------------------------

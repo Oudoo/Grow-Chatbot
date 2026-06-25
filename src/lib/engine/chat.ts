@@ -30,9 +30,12 @@ export interface TurnInput {
 export interface TurnResult {
   conversation: Conversation;
   userMessage: Message;
-  assistantMessage: Message;
-  meta: ProviderMeta;
+  /** Absent when the bot is paused (conversation handed off to a human). */
+  assistantMessage?: Message;
+  meta?: ProviderMeta;
   toolInvocations: ToolInvocation[];
+  /** True when the bot did not reply because the conversation is handed off. */
+  handoff: boolean;
 }
 
 export class EngineError extends Error {}
@@ -62,6 +65,18 @@ export async function processTurn(input: TurnInput): Promise<TurnResult> {
     sentiment: analyzeSentiment(text),
   });
 
+  // If the conversation has been handed off to a human, pause the bot: record
+  // the inbound message but do not auto-reply — a human agent answers instead.
+  if (conversation.status === "handoff") {
+    const paused = store.getConversation(conversation.id) ?? conversation;
+    return {
+      conversation: paused,
+      userMessage,
+      toolInvocations: [],
+      handoff: true,
+    };
+  }
+
   const system = buildSystemPrompt(bot);
   const messages: ChatMessage[] = [
     ...history,
@@ -87,6 +102,7 @@ export async function processTurn(input: TurnInput): Promise<TurnResult> {
     assistantMessage,
     meta: agent.providerMeta,
     toolInvocations: agent.toolInvocations,
+    handoff: false,
   };
 }
 
@@ -121,7 +137,7 @@ async function runAgent(
   conversationId: string,
 ): Promise<AgentResult> {
   const { provider, requested, fellBack } = resolveProvider(bot.provider);
-  const toolDefs = getToolDefs(bot.tools ?? []);
+  const toolDefs = getToolDefs(bot.tools ?? [], bot.tenantId);
   const ctx: ToolContext = { bot, conversationId };
   const messages: ChatMessage[] = [...baseMessages];
   const invocations: ToolInvocation[] = [];

@@ -9,6 +9,7 @@ import {
   IconChat,
   IconPlay,
   IconGlobe,
+  IconWrench,
 } from "@/components/icons";
 
 export function Sidebar() {
@@ -24,6 +25,7 @@ export function Sidebar() {
       Icon: IconChat,
     },
     { href: "/dashboard/playground", label: t.nav.playground, Icon: IconPlay },
+    { href: "/dashboard/tools", label: t.nav.tools, Icon: IconWrench },
   ];
 
   const isActive = (href: string, exact?: boolean) =>

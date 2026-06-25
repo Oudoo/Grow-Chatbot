@@ -23,10 +23,17 @@ to real, knowledge-grounded AI.
   to the mock provider so the app always responds. **Gemini is the default
   vendor.**
 - **Agentic tool-calling.** Bots can take real actions mid-conversation
-  (`lookup_order`, `product_lookup`, `create_ticket`) through a provider-neutral
-  tool framework with a bounded agent loop. Works across Claude / OpenAI /
-  Gemini, and the mock provider **simulates** tool calls so the whole flow is
-  demoable without keys.
+  (`lookup_order`, `product_lookup`, `create_ticket`, `escalate_to_human`)
+  through a provider-neutral tool framework with a bounded agent loop. Works
+  across Claude / OpenAI / Gemini, and the mock provider **simulates** tool
+  calls so the whole flow is demoable without keys.
+- **Live human handoff.** A bot can escalate to a human (via the
+  `escalate_to_human` tool or a manual takeover from the inbox); while handed
+  off the bot is paused, an agent replies from the inbox, and the widget polls
+  so the visitor sees the agent's messages in real time.
+- **User-defined HTTP tools (no code).** Register custom tools in the dashboard
+  that call any HTTP API — with parameter templating, a request timeout, and a
+  basic SSRF guard. They are picked up by every provider automatically.
 - **Bilingual RTL admin.** Full Arabic ⇄ English UI with automatic
   right-to-left layout. Arabic is the default.
 - **Channel-ready API.** One channel-agnostic `POST /api/chat` endpoint serves
@@ -111,9 +118,28 @@ Built-in tools (deterministic stand-ins for real merchant / CRM / logistics APIs
 | `lookup_order` | Returns an order's status by ID |
 | `product_lookup` | Returns price / availability from a demo catalog |
 | `create_ticket` | Persists a support ticket and returns its ID |
+| `escalate_to_human` | Hands the conversation to a human agent |
 
-Add your own by registering a `ToolImpl` in `src/lib/tools/index.ts` — every
-provider (and the mock simulator) picks it up automatically.
+Add code-defined tools by registering a `ToolImpl` in `src/lib/tools/index.ts`.
+
+### User-defined HTTP tools (no code)
+
+Go to **Tools** in the dashboard to register a tool that calls any HTTP API.
+You provide a name, description, method, URL, and parameters; the URL, headers,
+and body support `{param}` placeholders. At call time the engine substitutes the
+model's arguments, performs the request (8s timeout), and returns the response.
+
+A basic **SSRF guard** blocks loopback / private / link-local hosts
+(`localhost`, `127.0.0.0/8`, `10/8`, `192.168/16`, `172.16/12`, `169.254/16`).
+Custom tools are admin-configured and trusted; review URLs before enabling.
+
+### Live human handoff
+
+When a bot calls `escalate_to_human` (or an agent flips a conversation to
+**handoff** in the inbox), the bot stops auto-replying. A human answers from the
+inbox composer; replies are stored as agent messages and the embedded widget
+polls `GET /api/chat?conversationId=…` so the visitor sees them live. Set the
+conversation back to **open** to let the bot resume.
 
 ## The API
 
@@ -151,6 +177,9 @@ channels. Other endpoints:
 | `GET/PUT/DELETE /api/bots/:id` | Read / update / delete a bot |
 | `GET /api/conversations` | List conversations (optional `?botId=`) |
 | `GET/PATCH /api/conversations/:id` | Thread + messages / change status |
+| `POST /api/conversations/:id/reply` | Human agent posts a reply (handoff) |
+| `GET /api/chat?conversationId=…` | Poll a conversation's messages + status |
+| `GET/POST /api/tools` · `DELETE /api/tools/:id` | Manage user-defined HTTP tools |
 | `GET /api/providers` | Provider catalog (labels + configured flags) |
 | `GET /api/health` | Health + default provider |
 
@@ -200,10 +229,10 @@ agent loop ( resolveProvider(bot) → LLMProvider.chat ⇄ tools ) → persist �
 This MVP is built so the strategic differentiators slot into existing seams:
 
 - **Agentic workflows** — ✅ shipped: provider-neutral tool framework
-  (`src/lib/tools`) + bounded agent loop. Next: more built-in tools, MCP, and
-  user-defined HTTP tools.
-- **Live human handoff** — conversations already carry a `handoff` status; the
-  inbox is the place for agent takeover.
+  (`src/lib/tools`) + bounded agent loop + **user-defined HTTP tools**. Next:
+  MCP server support over the same seam.
+- **Live human handoff** — ✅ shipped: `escalate_to_human` tool + manual inbox
+  takeover + widget polling for agent replies.
 - **Native dialect NLP** — `Dialect` steering + an `analyzeSentiment` seam are
   ready to swap generic models for trained Arabic ones.
 - **Data sovereignty** — the `store/` layer is a single swap point for a

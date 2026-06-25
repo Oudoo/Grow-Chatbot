@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { processTurn, EngineError } from "@/lib/engine/chat";
 import { parseChannel } from "@/lib/validation";
+import * as store from "@/lib/store";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,6 +16,41 @@ const CORS = {
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS });
+}
+
+/**
+ * Public polling endpoint: fetch a conversation's messages and status so a
+ * widget can receive replies from a human agent during a handoff.
+ * `GET /api/chat?conversationId=...`
+ */
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const conversationId = searchParams.get("conversationId");
+  if (!conversationId) {
+    return NextResponse.json(
+      { error: "conversationId is required" },
+      { status: 400, headers: CORS },
+    );
+  }
+  const conversation = store.getConversation(conversationId);
+  if (!conversation) {
+    return NextResponse.json(
+      { error: "Not found" },
+      { status: 404, headers: CORS },
+    );
+  }
+  const messages = store.listMessages(conversationId).map((m) => ({
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    byAgent: m.byAgent ?? false,
+    tools: m.tools ?? [],
+    createdAt: m.createdAt,
+  }));
+  return NextResponse.json(
+    { status: conversation.status, messages },
+    { headers: CORS },
+  );
 }
 
 /**
@@ -59,10 +95,14 @@ export async function POST(req: Request) {
     return NextResponse.json(
       {
         conversationId: result.conversation.id,
-        reply: result.assistantMessage.content,
+        reply: result.assistantMessage?.content ?? null,
+        messageId: result.assistantMessage?.id,
+        userMessageId: result.userMessage.id,
         sentiment: result.userMessage.sentiment,
         meta: result.meta,
         tools: result.toolInvocations,
+        status: result.conversation.status,
+        handoff: result.handoff,
       },
       { headers: CORS },
     );

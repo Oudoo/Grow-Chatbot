@@ -106,6 +106,8 @@ export interface Message {
   meta?: ProviderMeta;
   /** Tool calls made while producing this (assistant) message. */
   tools?: ToolInvocation[];
+  /** True when an assistant message was written by a human agent, not the bot. */
+  byAgent?: boolean;
   createdAt: string;
 }
 
@@ -119,6 +121,32 @@ export interface Conversation {
   createdAt: string;
   updatedAt: string;
   lastMessageAt: string;
+}
+
+/** A single parameter of a user-defined HTTP tool (always a string input). */
+export interface CustomToolParam {
+  name: string;
+  description: string;
+}
+
+/**
+ * A tool defined by an admin in the dashboard (no code). When the model calls
+ * it, the engine performs the configured HTTP request and returns the response.
+ */
+export interface CustomTool {
+  id: string;
+  tenantId: string;
+  /** Unique tool name the model sees (snake_case). */
+  name: string;
+  description: string;
+  method: "GET" | "POST";
+  /** Target URL; may contain {param} placeholders. */
+  url: string;
+  headers?: Record<string, string>;
+  params: CustomToolParam[];
+  /** Optional request body template for POST; may contain {param} placeholders. */
+  bodyTemplate?: string;
+  createdAt: string;
 }
 
 /** A support ticket created by the `create_ticket` agentic tool. */
@@ -139,4 +167,5 @@ export interface Database {
   conversations: Conversation[];
   messages: Message[];
   tickets: Ticket[];
+  customTools: CustomTool[];
 }

@@ -1,5 +1,5 @@
 import * as store from "@/lib/store";
-import type { Bot } from "@/lib/types";
+import type { Bot, CustomTool } from "@/lib/types";
 import type { ToolDef } from "./types";
 
 export * from "./types";
@@ -43,11 +43,11 @@ const ORDER_STATUSES = [
 ];
 
 // ---------------------------------------------------------------------------
-// Tool registry. Each tool is a typed function the model can call mid-turn.
-// In production these would hit real merchant / CRM / logistics APIs; here they
-// are deterministic stand-ins so the agentic loop is fully demoable.
+// Built-in tool registry. In production these would hit real merchant / CRM /
+// logistics APIs; here they are deterministic stand-ins so the agentic loop is
+// fully demoable.
 // ---------------------------------------------------------------------------
-const TOOLS: Record<string, ToolImpl> = {
+const BUILTINS: Record<string, ToolImpl> = {
   lookup_order: {
     def: {
       name: "lookup_order",
@@ -117,7 +117,9 @@ const TOOLS: Record<string, ToolImpl> = {
       const q = str(args.query).toLowerCase();
       const match =
         CATALOG.find((p) => p.name.toLowerCase().includes(q)) ||
-        CATALOG.find((p) => q && p.name.toLowerCase().split(" ").some((w) => q.includes(w)));
+        CATALOG.find(
+          (p) => q && p.name.toLowerCase().split(" ").some((w) => q.includes(w)),
+        );
       if (!match) return `No catalog product matched "${str(args.query)}".`;
       return `${match.name}: price=${match.price} JOD; ${match.stock ? "in stock" : "out of stock"}.`;
     },
@@ -163,15 +165,162 @@ const TOOLS: Record<string, ToolImpl> = {
       return `Ticket ${ticket.id} created for: "${summary}". The team will follow up.`;
     },
   },
+
+  escalate_to_human: {
+    def: {
+      name: "escalate_to_human",
+      description:
+        "Hand the conversation over to a human agent when the user explicitly asks for a human, is frustrated, or the issue cannot be resolved automatically.",
+      parameters: {
+        type: "object",
+        properties: {
+          reason: {
+            type: "string",
+            description: "Why the conversation needs a human agent.",
+          },
+        },
+        required: [],
+      },
+      triggers: [
+        "human",
+        "agent",
+        "representative",
+        "person",
+        "موظف",
+        "بشري",
+        "ممثل",
+        "شخص",
+        "خدمة العملاء",
+      ],
+    },
+    execute(_args, ctx) {
+      if (ctx.conversationId) {
+        store.updateConversation(ctx.conversationId, { status: "handoff" });
+      }
+      return "Escalated to a human agent. A team member will join this conversation shortly.";
+    },
+  },
 };
 
-export function toolNames(): string[] {
-  return Object.keys(TOOLS);
+// --- Custom (user-defined HTTP) tools --------------------------------------
+
+function customToolToDef(ct: CustomTool): ToolDef {
+  const properties: ToolDef["parameters"]["properties"] = {};
+  for (const p of ct.params) {
+    properties[p.name] = { type: "string", description: p.description };
+  }
+  return {
+    name: ct.name,
+    description: ct.description,
+    parameters: {
+      type: "object",
+      properties,
+      required: ct.params.map((p) => p.name),
+    },
+    // Let the mock provider trigger custom tools by their name tokens for demos.
+    triggers: ct.name.split(/[_\-\s]+/).filter(Boolean).map((t) => t.toLowerCase()),
+  };
 }
 
-/** Resolve a list of tool names to their definitions (unknown names dropped). */
-export function getToolDefs(names: string[]): ToolDef[] {
-  return names.map((n) => TOOLS[n]?.def).filter((d): d is ToolDef => Boolean(d));
+function fillTemplate(
+  tpl: string,
+  values: Record<string, string>,
+  encode: boolean,
+): string {
+  return tpl.replace(/\{(\w+)\}/g, (_m, k: string) => {
+    const v = values[k] ?? "";
+    return encode ? encodeURIComponent(v) : v;
+  });
+}
+
+/** Basic SSRF guard: block loopback / private / link-local (metadata) hosts. */
+function isBlockedHost(hostname: string): boolean {
+  const h = hostname.toLowerCase();
+  if (h === "localhost" || h === "0.0.0.0" || h === "::1" || h.endsWith(".local"))
+    return true;
+  const m = h.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+  if (m) {
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    if (a === 127 || a === 10 || a === 0) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 169 && b === 254) return true;
+  }
+  return false;
+}
+
+async function executeCustomTool(
+  ct: CustomTool,
+  args: Record<string, unknown>,
+): Promise<string> {
+  const values: Record<string, string> = {};
+  for (const p of ct.params) values[p.name] = str(args[p.name]);
+
+  const url = fillTemplate(ct.url, values, true);
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return `Invalid URL produced for tool "${ct.name}".`;
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    return "Blocked: only http(s) URLs are allowed.";
+  }
+  if (isBlockedHost(parsed.hostname)) {
+    return "Blocked: target host is not allowed.";
+  }
+
+  const headers: Record<string, string> = {};
+  for (const [k, v] of Object.entries(ct.headers ?? {})) {
+    headers[k] = fillTemplate(v, values, false);
+  }
+
+  const init: RequestInit = { method: ct.method, headers };
+  if (ct.method === "POST") {
+    init.body = ct.bodyTemplate
+      ? fillTemplate(ct.bodyTemplate, values, false)
+      : JSON.stringify(values);
+    if (!headers["content-type"] && !headers["Content-Type"]) {
+      headers["content-type"] = "application/json";
+    }
+  }
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    const text = (await res.text()).slice(0, 600);
+    return `HTTP ${res.status}: ${text}`;
+  } catch (err) {
+    return `Request failed: ${err instanceof Error ? err.message : "error"}`;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// --- Public API ------------------------------------------------------------
+
+/** All available tool names: built-ins plus a tenant's custom tools. */
+export function toolNames(tenantId?: string): string[] {
+  const custom = tenantId ? store.listCustomTools(tenantId).map((t) => t.name) : [];
+  return [...Object.keys(BUILTINS), ...custom];
+}
+
+/** Resolve enabled tool names to their definitions (built-in + custom). */
+export function getToolDefs(names: string[], tenantId?: string): ToolDef[] {
+  const customByName = new Map(
+    (tenantId ? store.listCustomTools(tenantId) : []).map((t) => [t.name, t]),
+  );
+  const defs: ToolDef[] = [];
+  for (const name of names) {
+    if (BUILTINS[name]) defs.push(BUILTINS[name].def);
+    else {
+      const ct = customByName.get(name);
+      if (ct) defs.push(customToolToDef(ct));
+    }
+  }
+  return defs;
 }
 
 export async function executeTool(
@@ -179,11 +328,17 @@ export async function executeTool(
   args: Record<string, unknown>,
   ctx: ToolContext,
 ): Promise<string> {
-  const impl = TOOLS[name];
-  if (!impl) return `Unknown tool: ${name}`;
-  try {
-    return await impl.execute(args, ctx);
-  } catch (err) {
-    return `Tool "${name}" failed: ${err instanceof Error ? err.message : "error"}`;
+  const builtin = BUILTINS[name];
+  if (builtin) {
+    try {
+      return await builtin.execute(args, ctx);
+    } catch (err) {
+      return `Tool "${name}" failed: ${err instanceof Error ? err.message : "error"}`;
+    }
   }
+  const ct = store
+    .listCustomTools(ctx.bot.tenantId)
+    .find((t) => t.name === name);
+  if (ct) return executeCustomTool(ct, args);
+  return `Unknown tool: ${name}`;
 }

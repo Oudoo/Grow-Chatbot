@@ -73,6 +73,8 @@ export function Playground({ bots }: { bots: Bot[] }) {
             via: t.playground.via,
             fellBack: t.playground.fellBack,
             errorPrefix: t.common.error,
+            handoffNotice: t.handoff.notice,
+            agentBadge: t.handoff.badgeAgent,
           }}
         />
       </div>

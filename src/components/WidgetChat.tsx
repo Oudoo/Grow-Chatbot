@@ -10,6 +10,8 @@ const LABELS: Record<Language, ChatLabels> = {
     via: "عبر",
     fellBack: "وضع تجريبي",
     errorPrefix: "خطأ",
+    handoffNotice: "جارٍ تحويلك إلى موظف بشري…",
+    agentBadge: "موظف",
   },
   en: {
     placeholder: "Type your message…",
@@ -17,6 +19,8 @@ const LABELS: Record<Language, ChatLabels> = {
     via: "via",
     fellBack: "demo mode",
     errorPrefix: "Error",
+    handoffNotice: "Connecting you to a human agent…",
+    agentBadge: "Agent",
   },
 };
 
