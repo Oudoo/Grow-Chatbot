@@ -10,6 +10,8 @@ import {
   IconPlay,
   IconGlobe,
   IconWrench,
+  IconChart,
+  IconLink,
 } from "@/components/icons";
 
 export function Sidebar() {
@@ -26,6 +28,12 @@ export function Sidebar() {
     },
     { href: "/dashboard/playground", label: t.nav.playground, Icon: IconPlay },
     { href: "/dashboard/tools", label: t.nav.tools, Icon: IconWrench },
+    {
+      href: "/dashboard/integrations",
+      label: t.nav.integrations,
+      Icon: IconLink,
+    },
+    { href: "/dashboard/analytics", label: t.nav.analytics, Icon: IconChart },
   ];
 
   const isActive = (href: string, exact?: boolean) =>

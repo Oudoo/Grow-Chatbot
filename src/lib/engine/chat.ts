@@ -12,9 +12,10 @@ import {
   type ChatMessage,
   type LLMResult,
 } from "@/lib/llm";
-import { getToolDefs, executeTool, type ToolContext } from "@/lib/tools";
+import { buildToolset, type ToolContext } from "@/lib/tools";
 import * as store from "@/lib/store";
 import { analyzeSentiment } from "./sentiment";
+import { detectDialect } from "@/lib/nlp/dialect";
 import { buildSystemPrompt, toChatHistory } from "./prompt";
 
 const MAX_STEPS = 5;
@@ -57,12 +58,14 @@ export async function processTurn(input: TurnInput): Promise<TurnResult> {
   // Build history BEFORE recording the new inbound message.
   const history = toChatHistory(store.listMessages(conversation.id));
 
+  const detectedDialect = detectDialect(text);
   const userMessage = store.addMessage({
     conversationId: conversation.id,
     role: "user",
     content: text,
     channel: input.channel,
     sentiment: analyzeSentiment(text),
+    detectedDialect: detectedDialect !== "auto" ? detectedDialect : undefined,
   });
 
   // If the conversation has been handed off to a human, pause the bot: record
@@ -77,7 +80,12 @@ export async function processTurn(input: TurnInput): Promise<TurnResult> {
     };
   }
 
-  const system = buildSystemPrompt(bot);
+  // When a bot is set to auto-dialect, steer this turn to the detected dialect.
+  const effectiveDialect =
+    bot.dialect === "auto" && detectedDialect !== "auto"
+      ? detectedDialect
+      : bot.dialect;
+  const system = buildSystemPrompt(bot, effectiveDialect);
   const messages: ChatMessage[] = [
     ...history,
     { role: "user", content: text },
@@ -137,7 +145,7 @@ async function runAgent(
   conversationId: string,
 ): Promise<AgentResult> {
   const { provider, requested, fellBack } = resolveProvider(bot.provider);
-  const toolDefs = getToolDefs(bot.tools ?? [], bot.tenantId);
+  const toolset = await buildToolset(bot);
   const ctx: ToolContext = { bot, conversationId };
   const messages: ChatMessage[] = [...baseMessages];
   const invocations: ToolInvocation[] = [];
@@ -147,7 +155,7 @@ async function runAgent(
     system,
     model: bot.model || undefined,
     temperature: bot.temperature,
-    tools: toolDefs.length ? toolDefs : undefined,
+    tools: toolset.defs.length ? toolset.defs : undefined,
   };
 
   const finalize = (result: LLMResult, steps: number): AgentResult => ({
@@ -172,7 +180,7 @@ async function runAgent(
           toolCalls: result.toolCalls,
         });
         for (const call of result.toolCalls) {
-          const output = await executeTool(call.name, call.arguments, ctx);
+          const output = await toolset.execute(call.name, call.arguments, ctx);
           invocations.push({
             name: call.name,
             args: call.arguments,

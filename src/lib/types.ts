@@ -73,6 +73,8 @@ export interface Bot {
   temperature: number;
   /** Names of the agentic tools this bot is allowed to call. */
   tools: string[];
+  /** IDs of MCP servers whose tools this bot may call. */
+  mcpServers: string[];
   status: BotStatus;
   createdAt: string;
   updatedAt: string;
@@ -103,6 +105,8 @@ export interface Message {
   content: string;
   channel?: Channel;
   sentiment?: Sentiment;
+  /** Detected Arabic dialect of a user message (when detection ran). */
+  detectedDialect?: Dialect;
   meta?: ProviderMeta;
   /** Tool calls made while producing this (assistant) message. */
   tools?: ToolInvocation[];
@@ -160,6 +164,40 @@ export interface Ticket {
   createdAt: string;
 }
 
+/** A registered MCP (Model Context Protocol) server whose tools bots can call. */
+export interface McpServer {
+  id: string;
+  tenantId: string;
+  name: string;
+  /** HTTP(S) endpoint speaking MCP JSON-RPC (Streamable HTTP transport). */
+  url: string;
+  headers?: Record<string, string>;
+  createdAt: string;
+}
+
+export type IntegrationType =
+  | "shopify"
+  | "woocommerce"
+  | "salesforce"
+  | "hubspot"
+  | "zoho";
+
+/**
+ * A connected CRM / e-commerce system. When connected it exposes a set of
+ * integration tools bots can call. Without a baseUrl/apiKey the tools return
+ * clearly-labelled demo data; with them they call the real API.
+ */
+export interface Integration {
+  id: string;
+  tenantId: string;
+  type: IntegrationType;
+  name: string;
+  baseUrl?: string;
+  apiKey?: string;
+  status: "connected" | "disabled";
+  createdAt: string;
+}
+
 /** Shape persisted by the file-backed dev store. */
 export interface Database {
   tenants: Tenant[];
@@ -168,4 +206,6 @@ export interface Database {
   messages: Message[];
   tickets: Ticket[];
   customTools: CustomTool[];
+  mcpServers: McpServer[];
+  integrations: Integration[];
 }

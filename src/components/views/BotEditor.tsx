@@ -21,12 +21,14 @@ export function BotEditor({
   providers,
   defaultProvider,
   availableTools,
+  availableMcpServers,
 }: {
   mode: "create" | "edit";
   bot?: Bot;
   providers: ProviderInfo[];
   defaultProvider: ProviderId;
   availableTools: string[];
+  availableMcpServers: { id: string; name: string }[];
 }) {
   const { t } = useLang();
 
@@ -66,6 +68,7 @@ export function BotEditor({
         providers={providers}
         defaultProvider={defaultProvider}
         availableTools={availableTools}
+        availableMcpServers={availableMcpServers}
       />
 
       {mode === "edit" && bot && (

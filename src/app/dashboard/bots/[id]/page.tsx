@@ -16,6 +16,9 @@ export default function EditBotPage({ params }: { params: { id: string } }) {
       providers={providerCatalog()}
       defaultProvider={globalDefaultProvider()}
       availableTools={toolNames(bot.tenantId)}
+      availableMcpServers={store
+        .listMcpServers(bot.tenantId)
+        .map((s) => ({ id: s.id, name: s.name }))}
     />
   );
 }

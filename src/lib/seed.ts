@@ -42,6 +42,7 @@ export function seedIfEmpty(): void {
       "create_ticket",
       "escalate_to_human",
     ],
+    mcpServers: [],
     status: "active",
   };
 
@@ -66,6 +67,7 @@ export function seedIfEmpty(): void {
     provider: "default",
     temperature: 0.4,
     tools: ["create_ticket", "escalate_to_human"],
+    mcpServers: [],
     status: "active",
   };
 

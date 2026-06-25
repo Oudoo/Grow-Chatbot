@@ -6,6 +6,8 @@ import type {
   Conversation,
   CustomTool,
   Database,
+  Integration,
+  McpServer,
   Message,
   Sentiment,
   Tenant,
@@ -32,6 +34,8 @@ const EMPTY_DB: Database = {
   messages: [],
   tickets: [],
   customTools: [],
+  mcpServers: [],
+  integrations: [],
 };
 
 function ensureFile(): void {
@@ -53,6 +57,8 @@ export function readDb(): Database {
       messages: parsed.messages ?? [],
       tickets: parsed.tickets ?? [],
       customTools: parsed.customTools ?? [],
+      mcpServers: parsed.mcpServers ?? [],
+      integrations: parsed.integrations ?? [],
     };
   } catch {
     return { ...EMPTY_DB };
@@ -279,6 +285,69 @@ export function deleteCustomTool(id: string): boolean {
   return db.customTools.length < before;
 }
 
+// --- MCP servers -----------------------------------------------------------
+
+export type NewMcpServer = Omit<McpServer, "id" | "createdAt">;
+
+export function listMcpServers(tenantId?: string): McpServer[] {
+  const servers = readDb().mcpServers;
+  return tenantId ? servers.filter((s) => s.tenantId === tenantId) : servers;
+}
+
+export function getMcpServer(id: string): McpServer | undefined {
+  return readDb().mcpServers.find((s) => s.id === id);
+}
+
+export function createMcpServer(data: NewMcpServer): McpServer {
+  const db = readDb();
+  const server: McpServer = { ...data, id: newId(), createdAt: now() };
+  db.mcpServers.push(server);
+  writeDb(db);
+  return server;
+}
+
+export function deleteMcpServer(id: string): boolean {
+  const db = readDb();
+  const before = db.mcpServers.length;
+  db.mcpServers = db.mcpServers.filter((s) => s.id !== id);
+  for (const bot of db.bots) {
+    if (bot.mcpServers?.includes(id)) {
+      bot.mcpServers = bot.mcpServers.filter((x) => x !== id);
+    }
+  }
+  writeDb(db);
+  return db.mcpServers.length < before;
+}
+
+// --- Integrations ----------------------------------------------------------
+
+export type NewIntegration = Omit<Integration, "id" | "createdAt">;
+
+export function listIntegrations(tenantId?: string): Integration[] {
+  const items = readDb().integrations;
+  return tenantId ? items.filter((i) => i.tenantId === tenantId) : items;
+}
+
+export function getIntegration(id: string): Integration | undefined {
+  return readDb().integrations.find((i) => i.id === id);
+}
+
+export function createIntegration(data: NewIntegration): Integration {
+  const db = readDb();
+  const integration: Integration = { ...data, id: newId(), createdAt: now() };
+  db.integrations.push(integration);
+  writeDb(db);
+  return integration;
+}
+
+export function deleteIntegration(id: string): boolean {
+  const db = readDb();
+  const before = db.integrations.length;
+  db.integrations = db.integrations.filter((i) => i.id !== id);
+  writeDb(db);
+  return db.integrations.length < before;
+}
+
 // --- Stats -----------------------------------------------------------------
 
 export interface DashboardStats {
@@ -325,5 +394,114 @@ export function stats(tenantId?: string): DashboardStats {
       channel,
       count,
     })),
+  };
+}
+
+export interface AnalyticsData {
+  totals: {
+    conversations: number;
+    messages: number;
+    bots: number;
+    tickets: number;
+  };
+  sentiment: Record<Sentiment, number>;
+  byDay: { date: string; conversations: number; messages: number }[];
+  toolUsage: { name: string; count: number }[];
+  dialects: { dialect: string; count: number }[];
+  handoffRate: number;
+  avgLatencyMs: number;
+  avgMessagesPerConversation: number;
+  topBots: { name: string; conversations: number }[];
+}
+
+export function analytics(tenantId?: string): AnalyticsData {
+  const db = readDb();
+  const bots = tenantId ? db.bots.filter((b) => b.tenantId === tenantId) : db.bots;
+  const convos = tenantId
+    ? db.conversations.filter((c) => c.tenantId === tenantId)
+    : db.conversations;
+  const convoIds = new Set(convos.map((c) => c.id));
+  const msgs = db.messages.filter((m) => convoIds.has(m.conversationId));
+  const tickets = tenantId
+    ? db.tickets.filter((t) => t.tenantId === tenantId)
+    : db.tickets;
+
+  const sentiment: Record<Sentiment, number> = {
+    positive: 0,
+    negative: 0,
+    neutral: 0,
+  };
+  const dialectMap = new Map<string, number>();
+  const toolMap = new Map<string, number>();
+  let latencySum = 0;
+  let latencyN = 0;
+
+  for (const m of msgs) {
+    if (m.role === "user") {
+      if (m.sentiment) sentiment[m.sentiment]++;
+      if (m.detectedDialect) {
+        dialectMap.set(m.detectedDialect, (dialectMap.get(m.detectedDialect) ?? 0) + 1);
+      }
+    } else if (m.role === "assistant") {
+      if (m.meta?.latencyMs != null) {
+        latencySum += m.meta.latencyMs;
+        latencyN++;
+      }
+      for (const inv of m.tools ?? []) {
+        toolMap.set(inv.name, (toolMap.get(inv.name) ?? 0) + 1);
+      }
+    }
+  }
+
+  const days: string[] = [];
+  const base = new Date();
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(base);
+    d.setUTCDate(base.getUTCDate() - i);
+    days.push(d.toISOString().slice(0, 10));
+  }
+  const byDay = days.map((date) => ({
+    date,
+    conversations: convos.filter((c) => c.createdAt.slice(0, 10) === date).length,
+    messages: msgs.filter((m) => m.createdAt.slice(0, 10) === date).length,
+  }));
+
+  const convosWithAgent = new Set(
+    msgs.filter((m) => m.byAgent).map((m) => m.conversationId),
+  );
+  const handoffRate = convos.length ? convosWithAgent.size / convos.length : 0;
+
+  const botCount = new Map<string, number>();
+  for (const c of convos) botCount.set(c.botId, (botCount.get(c.botId) ?? 0) + 1);
+  const topBots = [...botCount.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([id, count]) => ({
+      name: bots.find((b) => b.id === id)?.name ?? "—",
+      conversations: count,
+    }));
+
+  return {
+    totals: {
+      conversations: convos.length,
+      messages: msgs.length,
+      bots: bots.length,
+      tickets: tickets.length,
+    },
+    sentiment,
+    byDay,
+    toolUsage: [...toolMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count })),
+    dialects: [...dialectMap.entries()].map(([dialect, count]) => ({
+      dialect,
+      count,
+    })),
+    handoffRate,
+    avgLatencyMs: latencyN ? Math.round(latencySum / latencyN) : 0,
+    avgMessagesPerConversation: convos.length
+      ? Math.round((msgs.length / convos.length) * 10) / 10
+      : 0,
+    topBots,
   };
 }

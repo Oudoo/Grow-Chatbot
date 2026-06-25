@@ -1,14 +1,29 @@
-import type { NewBot, NewCustomTool } from "@/lib/store";
+import type {
+  NewBot,
+  NewCustomTool,
+  NewIntegration,
+  NewMcpServer,
+} from "@/lib/store";
+import { listMcpServers } from "@/lib/store";
 import type {
   BotProvider,
   Channel,
   CustomToolParam,
   Dialect,
+  IntegrationType,
   Language,
   BotStatus,
 } from "@/lib/types";
 import { CHANNELS } from "@/lib/types";
 import { toolNames } from "@/lib/tools";
+
+const INTEGRATION_TYPES: IntegrationType[] = [
+  "shopify",
+  "woocommerce",
+  "salesforce",
+  "hubspot",
+  "zoho",
+];
 
 const BUILTIN_TOOL_NAMES = new Set([
   "lookup_order",
@@ -71,6 +86,13 @@ export function parseBotInput(body: unknown, tenantId: string): Parsed<NewBot> {
     ? (b.tools as unknown[]).map((t) => String(t)).filter((t) => known.has(t))
     : [];
 
+  const knownMcp = new Set(listMcpServers(tenantId).map((s) => s.id));
+  const mcpServers = Array.isArray(b.mcpServers)
+    ? (b.mcpServers as unknown[])
+        .map((s) => String(s))
+        .filter((s) => knownMcp.has(s))
+    : [];
+
   const value: NewBot = {
     tenantId,
     name,
@@ -88,6 +110,7 @@ export function parseBotInput(body: unknown, tenantId: string): Parsed<NewBot> {
     model: b.model ? String(b.model).trim() : undefined,
     temperature,
     tools,
+    mcpServers,
     status: pick<BotStatus>(b.status, STATUSES, "active"),
   };
   return { ok: true, value };
@@ -95,6 +118,52 @@ export function parseBotInput(body: unknown, tenantId: string): Parsed<NewBot> {
 
 export function parseChannel(val: unknown, fallback: Channel = "api"): Channel {
   return pick<Channel>(val, CHANNELS, fallback);
+}
+
+/** Validate an incoming MCP server registration. */
+export function parseMcpServerInput(
+  body: unknown,
+  tenantId: string,
+): Parsed<NewMcpServer> {
+  if (!body || typeof body !== "object") {
+    return { ok: false, error: "Invalid request body" };
+  }
+  const b = body as Record<string, unknown>;
+  const name = String(b.name ?? "").trim();
+  if (!name) return { ok: false, error: "Name is required" };
+  const url = String(b.url ?? "").trim();
+  if (!/^https?:\/\//i.test(url)) {
+    return { ok: false, error: "URL must start with http:// or https://" };
+  }
+  let headers: Record<string, string> | undefined;
+  if (b.headers && typeof b.headers === "object") {
+    const h: Record<string, string> = {};
+    for (const [k, v] of Object.entries(b.headers as Record<string, unknown>)) {
+      const key = String(k).trim();
+      if (key) h[key] = String(v);
+    }
+    if (Object.keys(h).length) headers = h;
+  }
+  return { ok: true, value: { tenantId, name, url, headers } };
+}
+
+/** Validate an incoming CRM / e-commerce integration. */
+export function parseIntegrationInput(
+  body: unknown,
+  tenantId: string,
+): Parsed<NewIntegration> {
+  if (!body || typeof body !== "object") {
+    return { ok: false, error: "Invalid request body" };
+  }
+  const b = body as Record<string, unknown>;
+  const type = pick<IntegrationType>(b.type, INTEGRATION_TYPES, "shopify");
+  const name = String(b.name ?? "").trim() || type;
+  const baseUrl = b.baseUrl ? String(b.baseUrl).trim() : undefined;
+  const apiKey = b.apiKey ? String(b.apiKey).trim() : undefined;
+  return {
+    ok: true,
+    value: { tenantId, type, name, baseUrl, apiKey, status: "connected" },
+  };
 }
 
 /** Validate and normalise an incoming custom HTTP tool payload. */

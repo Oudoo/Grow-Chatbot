@@ -18,9 +18,10 @@ const DIALECT_GUIDANCE: Record<Dialect, string> = {
 
 /**
  * Compose the full system prompt for a bot turn: identity, language/dialect
- * steering, knowledge grounding, and guardrails.
+ * steering, knowledge grounding, and guardrails. `dialectOverride` lets the
+ * engine inject a per-turn detected dialect when the bot is set to auto.
  */
-export function buildSystemPrompt(bot: Bot): string {
+export function buildSystemPrompt(bot: Bot, dialectOverride?: Dialect): string {
   const parts: string[] = [];
 
   parts.push(
@@ -32,8 +33,10 @@ export function buildSystemPrompt(bot: Bot): string {
   }
 
   if (bot.language === "ar") {
+    const dialect =
+      dialectOverride && dialectOverride !== "auto" ? dialectOverride : bot.dialect;
     parts.push(
-      `Always reply in Arabic. ${DIALECT_GUIDANCE[bot.dialect]} Keep right-to-left phrasing natural. You may understand "Arabizi" (Arabic written in Latin letters/numbers) and reply in Arabic script.`,
+      `Always reply in Arabic. ${DIALECT_GUIDANCE[dialect]} Keep right-to-left phrasing natural. You may understand "Arabizi" (Arabic written in Latin letters/numbers) and reply in Arabic script.`,
     );
   } else {
     parts.push(

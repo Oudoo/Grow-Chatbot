@@ -34,6 +34,15 @@ to real, knowledge-grounded AI.
 - **User-defined HTTP tools (no code).** Register custom tools in the dashboard
   that call any HTTP API — with parameter templating, a request timeout, and a
   basic SSRF guard. They are picked up by every provider automatically.
+- **MCP servers + CRM/e-commerce integrations.** Connect MCP servers (a
+  self-contained demo server is built in) and connectors for Shopify,
+  WooCommerce, Salesforce, HubSpot and Zoho; their tools flow into the same
+  agent loop, selectable per bot.
+- **Native Arabic dialect detection.** A heuristic classifier tags each message
+  (Gulf / Levantine / Egyptian / Maghrebi / MSA) and auto-steers replies when a
+  bot is set to auto-dialect.
+- **Analytics dashboard.** 14-day volume, sentiment, tool usage, dialect mix,
+  handoff rate, latency, and top bots — computed from the store.
 - **Bilingual RTL admin.** Full Arabic ⇄ English UI with automatic
   right-to-left layout. Arabic is the default.
 - **Channel-ready API.** One channel-agnostic `POST /api/chat` endpoint serves
@@ -141,6 +150,32 @@ inbox composer; replies are stored as agent messages and the embedded widget
 polls `GET /api/chat?conversationId=…` so the visitor sees them live. Set the
 conversation back to **open** to let the bot resume.
 
+### MCP servers
+
+Register Model Context Protocol servers on the **Tools** page and enable them
+per bot. Each turn, the engine lists the server's tools (namespaced) and routes
+calls to it via JSON-RPC. A self-contained demo server ships at
+`/api/mcp/demo` — click "use built-in demo server" to try it with no setup.
+
+### CRM / e-commerce integrations
+
+Connect Shopify, WooCommerce, Salesforce, HubSpot, or Zoho on the
+**Integrations** page. Each connected system contributes tools
+(`shopify_get_order`, `sf_create_lead`, …) selectable per bot. Without a Base
+URL the tools return clearly-labelled demo data; `baseUrl`/`apiKey` are the seam
+for real API calls.
+
+### Dialect detection
+
+`src/lib/nlp/dialect.ts` scores characteristic markers to tag each Arabic
+message's dialect. When a bot is set to **auto** dialect, the engine steers that
+turn to the detected dialect; detections show in the inbox and feed analytics.
+
+### Analytics
+
+The **Analytics** page reports 14-day volume, sentiment, tool usage, detected
+dialect mix, handoff rate, average latency, and top bots — all from the store.
+
 ## The API
 
 ### `POST /api/chat` — channel-agnostic message ingestion
@@ -180,6 +215,9 @@ channels. Other endpoints:
 | `POST /api/conversations/:id/reply` | Human agent posts a reply (handoff) |
 | `GET /api/chat?conversationId=…` | Poll a conversation's messages + status |
 | `GET/POST /api/tools` · `DELETE /api/tools/:id` | Manage user-defined HTTP tools |
+| `GET/POST /api/mcp` · `DELETE /api/mcp/:id` · `GET /api/mcp/:id/tools` | Manage MCP servers |
+| `POST /api/mcp/demo` | Built-in demo MCP server (JSON-RPC) |
+| `GET/POST /api/integrations` · `DELETE /api/integrations/:id` | Manage integrations |
 | `GET /api/providers` | Provider catalog (labels + configured flags) |
 | `GET /api/health` | Health + default provider |
 
@@ -209,8 +247,11 @@ src/
   components/            # React UI (ChatPanel, BotForm, inbox, sidebar, i18n provider…)
   lib/
     llm/                 # provider abstraction + mock/anthropic/openai/gemini + factory
-    tools/               # agentic tool framework + built-in tools
-    engine/              # prompt builder, sentiment, agent loop orchestration
+    tools/               # tool framework + built-ins + buildToolset aggregator
+    mcp/                 # minimal MCP (JSON-RPC over HTTP) client
+    integrations/        # CRM / e-commerce connector catalog + tools
+    nlp/                 # Arabic dialect detection
+    engine/              # prompt builder, sentiment, dialect, agent loop
     store/               # file-backed repositories (swap for Postgres later)
     i18n/                # ar/en dictionaries
     types.ts             # shared domain types
@@ -229,12 +270,16 @@ agent loop ( resolveProvider(bot) → LLMProvider.chat ⇄ tools ) → persist �
 This MVP is built so the strategic differentiators slot into existing seams:
 
 - **Agentic workflows** — ✅ shipped: provider-neutral tool framework
-  (`src/lib/tools`) + bounded agent loop + **user-defined HTTP tools**. Next:
-  MCP server support over the same seam.
+  (`src/lib/tools`) + bounded agent loop + **user-defined HTTP tools** +
+  **MCP servers**. All tool sources merge in `buildToolset`.
 - **Live human handoff** — ✅ shipped: `escalate_to_human` tool + manual inbox
   takeover + widget polling for agent replies.
-- **Native dialect NLP** — `Dialect` steering + an `analyzeSentiment` seam are
-  ready to swap generic models for trained Arabic ones.
+- **Native dialect NLP** — ✅ shipped: heuristic detector (`src/lib/nlp`) with
+  auto-dialect routing. Next: swap in a trained Arabic classifier behind the
+  same seam.
+- **CRM / e-commerce & analytics** — ✅ shipped: connector catalog
+  (Shopify/WooCommerce/Salesforce/HubSpot/Zoho) + analytics dashboard. Next:
+  voice channels and A/B testing.
 - **Data sovereignty** — the `store/` layer is a single swap point for a
   self-hosted DB; the `LLMProvider` interface accepts a self-hosted model.
 - **CRM / e-commerce integrations, voice, analytics, A/B testing** — layer onto

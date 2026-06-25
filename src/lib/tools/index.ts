@@ -1,5 +1,10 @@
 import * as store from "@/lib/store";
 import type { Bot, CustomTool } from "@/lib/types";
+import {
+  integrationToolNames,
+  resolveIntegrationTool,
+} from "@/lib/integrations";
+import { mcpListTools, mcpCallTool } from "@/lib/mcp/client";
 import type { ToolDef } from "./types";
 
 export * from "./types";
@@ -8,6 +13,21 @@ export * from "./types";
 export interface ToolContext {
   bot: Bot;
   conversationId?: string;
+}
+
+type ToolRunner = (
+  args: Record<string, unknown>,
+  ctx: ToolContext,
+) => Promise<string> | string;
+
+/** A per-turn set of resolved tools with a single executor. */
+export interface Toolset {
+  defs: ToolDef[];
+  execute(
+    name: string,
+    args: Record<string, unknown>,
+    ctx: ToolContext,
+  ): Promise<string>;
 }
 
 interface ToolImpl {
@@ -301,44 +321,84 @@ async function executeCustomTool(
 
 // --- Public API ------------------------------------------------------------
 
-/** All available tool names: built-ins plus a tenant's custom tools. */
+/**
+ * All tool names selectable per bot: built-ins + a tenant's custom HTTP tools +
+ * tools from connected integrations. (MCP tools are enabled per server, not by
+ * name, so they are not listed here.)
+ */
 export function toolNames(tenantId?: string): string[] {
-  const custom = tenantId ? store.listCustomTools(tenantId).map((t) => t.name) : [];
-  return [...Object.keys(BUILTINS), ...custom];
+  if (!tenantId) return Object.keys(BUILTINS);
+  return [
+    ...Object.keys(BUILTINS),
+    ...store.listCustomTools(tenantId).map((t) => t.name),
+    ...integrationToolNames(tenantId),
+  ];
 }
 
-/** Resolve enabled tool names to their definitions (built-in + custom). */
-export function getToolDefs(names: string[], tenantId?: string): ToolDef[] {
-  const customByName = new Map(
-    (tenantId ? store.listCustomTools(tenantId) : []).map((t) => [t.name, t]),
-  );
+/**
+ * Build the per-turn toolset for a bot, aggregating every tool source —
+ * built-ins, custom HTTP tools, integration tools, and (async) MCP servers —
+ * behind a single executor.
+ */
+export async function buildToolset(bot: Bot): Promise<Toolset> {
+  const tenantId = bot.tenantId;
+  const enabled = bot.tools ?? [];
   const defs: ToolDef[] = [];
-  for (const name of names) {
-    if (BUILTINS[name]) defs.push(BUILTINS[name].def);
-    else {
-      const ct = customByName.get(name);
-      if (ct) defs.push(customToolToDef(ct));
-    }
-  }
-  return defs;
-}
+  const runners = new Map<string, ToolRunner>();
 
-export async function executeTool(
-  name: string,
-  args: Record<string, unknown>,
-  ctx: ToolContext,
-): Promise<string> {
-  const builtin = BUILTINS[name];
-  if (builtin) {
-    try {
-      return await builtin.execute(args, ctx);
-    } catch (err) {
-      return `Tool "${name}" failed: ${err instanceof Error ? err.message : "error"}`;
+  // Built-in tools
+  for (const name of enabled) {
+    const b = BUILTINS[name];
+    if (b) {
+      defs.push(b.def);
+      runners.set(name, b.execute);
     }
   }
-  const ct = store
-    .listCustomTools(ctx.bot.tenantId)
-    .find((t) => t.name === name);
-  if (ct) return executeCustomTool(ct, args);
-  return `Unknown tool: ${name}`;
+
+  // Custom HTTP tools
+  const customs = store.listCustomTools(tenantId);
+  for (const ct of customs) {
+    if (!enabled.includes(ct.name)) continue;
+    defs.push(customToolToDef(ct));
+    runners.set(ct.name, (args) => executeCustomTool(ct, args));
+  }
+
+  // Integration (CRM / e-commerce) tools
+  for (const name of enabled) {
+    if (BUILTINS[name] || customs.some((c) => c.name === name)) continue;
+    const it = resolveIntegrationTool(tenantId, name);
+    if (it) {
+      defs.push(it.def);
+      runners.set(name, (args) => it.execute(args));
+    }
+  }
+
+  // MCP server tools (fetched live; namespaced to avoid collisions)
+  for (const serverId of bot.mcpServers ?? []) {
+    const server = store.getMcpServer(serverId);
+    if (!server) continue;
+    try {
+      const mcpTools = await mcpListTools(server);
+      for (const td of mcpTools) {
+        const ns = `mcp_${server.id.slice(0, 6)}__${td.name}`;
+        defs.push({ ...td, name: ns });
+        runners.set(ns, (args) => mcpCallTool(server, td.name, args));
+      }
+    } catch (err) {
+      console.error(`[mcp] tools/list failed for ${server.name}:`, err);
+    }
+  }
+
+  return {
+    defs,
+    async execute(name, args, ctx) {
+      const runner = runners.get(name);
+      if (!runner) return `Unknown tool: ${name}`;
+      try {
+        return await runner(args, ctx);
+      } catch (err) {
+        return `Tool "${name}" failed: ${err instanceof Error ? err.message : "error"}`;
+      }
+    },
+  };
 }

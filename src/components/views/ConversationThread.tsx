@@ -154,6 +154,13 @@ export function ConversationThread({
                       {t.sentiment[m.sentiment]}
                     </span>
                   )}
+                  {m.role === "user" && m.detectedDialect && (
+                    <span className="rounded bg-violet-50 px-1.5 py-0.5 text-violet-700">
+                      {(t.dialects as Record<string, string>)[
+                        m.detectedDialect
+                      ] ?? m.detectedDialect}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

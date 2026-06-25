@@ -13,6 +13,9 @@ export default function NewBotPage() {
       providers={providerCatalog()}
       defaultProvider={globalDefaultProvider()}
       availableTools={toolNames(tenant.id)}
+      availableMcpServers={store
+        .listMcpServers(tenant.id)
+        .map((s) => ({ id: s.id, name: s.name }))}
     />
   );
 }

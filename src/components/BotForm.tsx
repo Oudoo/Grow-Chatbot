@@ -24,6 +24,7 @@ interface BotFormProps {
   providers: ProviderInfo[];
   defaultProvider: ProviderId;
   availableTools: string[];
+  availableMcpServers: { id: string; name: string }[];
 }
 
 interface FormState {
@@ -38,6 +39,7 @@ interface FormState {
   model: string;
   temperature: number;
   tools: string[];
+  mcpServers: string[];
   status: "active" | "draft";
 }
 
@@ -56,6 +58,7 @@ export function BotForm({
   providers,
   defaultProvider,
   availableTools,
+  availableMcpServers,
 }: BotFormProps) {
   const { t, dir } = useLang();
   const router = useRouter();
@@ -72,6 +75,7 @@ export function BotForm({
     model: bot?.model ?? "",
     temperature: bot?.temperature ?? 0.4,
     tools: bot?.tools ?? [],
+    mcpServers: bot?.mcpServers ?? [],
     status: bot?.status ?? "active",
   });
   const [saving, setSaving] = useState(false);
@@ -89,6 +93,16 @@ export function BotForm({
       tools: f.tools.includes(name)
         ? f.tools.filter((x) => x !== name)
         : [...f.tools, name],
+    }));
+    setSaved(false);
+  }
+
+  function toggleMcp(id: string) {
+    setForm((f) => ({
+      ...f,
+      mcpServers: f.mcpServers.includes(id)
+        ? f.mcpServers.filter((x) => x !== id)
+        : [...f.mcpServers, id],
     }));
     setSaved(false);
   }
@@ -297,6 +311,39 @@ export function BotForm({
                   >
                     {name}
                   </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* MCP servers */}
+      {availableMcpServers.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <h2 className="text-sm font-medium text-slate-700">
+            {t.botMcp.title}
+          </h2>
+          <p className="mt-1 text-xs text-slate-400">{t.botMcp.hint}</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {availableMcpServers.map((s) => {
+              const checked = form.mcpServers.includes(s.id);
+              return (
+                <label
+                  key={s.id}
+                  className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition ${
+                    checked
+                      ? "border-violet-300 bg-violet-50"
+                      : "border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleMcp(s.id)}
+                    className="accent-violet-600"
+                  />
+                  <span className="font-medium text-slate-700">{s.name}</span>
                 </label>
               );
             })}
