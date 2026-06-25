@@ -23,7 +23,9 @@ export const ALL_PROVIDER_IDS: ProviderId[] = [
 
 /** The backend global default, set via the LLM_PROVIDER env var. */
 export function globalDefaultProvider(): ProviderId {
-  const v = (process.env.LLM_PROVIDER || "mock").toLowerCase();
+  // Gemini is the house default vendor; it transparently falls back to the
+  // mock provider when no GEMINI_API_KEY is configured, so the app still runs.
+  const v = (process.env.LLM_PROVIDER || "gemini").toLowerCase();
   return (ALL_PROVIDER_IDS as string[]).includes(v) ? (v as ProviderId) : "mock";
 }
 

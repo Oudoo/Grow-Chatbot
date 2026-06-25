@@ -71,6 +71,8 @@ export interface Bot {
   /** Optional model override; falls back to the provider's default model. */
   model?: string;
   temperature: number;
+  /** Names of the agentic tools this bot is allowed to call. */
+  tools: string[];
   status: BotStatus;
   createdAt: string;
   updatedAt: string;
@@ -83,6 +85,15 @@ export interface ProviderMeta {
   latencyMs: number;
   /** True when the requested provider was unavailable and mock answered instead. */
   fellBack?: boolean;
+  /** Number of agent loop steps taken (>1 means tools were called). */
+  steps?: number;
+}
+
+/** A single agentic tool call the engine executed during a turn. */
+export interface ToolInvocation {
+  name: string;
+  args: Record<string, unknown>;
+  result: string;
 }
 
 export interface Message {
@@ -93,6 +104,8 @@ export interface Message {
   channel?: Channel;
   sentiment?: Sentiment;
   meta?: ProviderMeta;
+  /** Tool calls made while producing this (assistant) message. */
+  tools?: ToolInvocation[];
   createdAt: string;
 }
 
@@ -108,10 +121,22 @@ export interface Conversation {
   lastMessageAt: string;
 }
 
+/** A support ticket created by the `create_ticket` agentic tool. */
+export interface Ticket {
+  id: string;
+  tenantId: string;
+  botId?: string;
+  conversationId?: string;
+  summary: string;
+  status: "open" | "closed";
+  createdAt: string;
+}
+
 /** Shape persisted by the file-backed dev store. */
 export interface Database {
   tenants: Tenant[];
   bots: Bot[];
   conversations: Conversation[];
   messages: Message[];
+  tickets: Ticket[];
 }

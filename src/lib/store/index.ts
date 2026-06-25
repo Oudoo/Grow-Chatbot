@@ -8,6 +8,7 @@ import type {
   Message,
   Sentiment,
   Tenant,
+  Ticket,
 } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -28,6 +29,7 @@ const EMPTY_DB: Database = {
   bots: [],
   conversations: [],
   messages: [],
+  tickets: [],
 };
 
 function ensureFile(): void {
@@ -47,6 +49,7 @@ export function readDb(): Database {
       bots: parsed.bots ?? [],
       conversations: parsed.conversations ?? [],
       messages: parsed.messages ?? [],
+      tickets: parsed.tickets ?? [],
     };
   } catch {
     return { ...EMPTY_DB };
@@ -214,6 +217,34 @@ export function addMessage(data: NewMessage): Message {
   }
   writeDb(db);
   return message;
+}
+
+// --- Tickets ---------------------------------------------------------------
+
+export function createTicket(data: {
+  tenantId: string;
+  botId?: string;
+  conversationId?: string;
+  summary: string;
+}): Ticket {
+  const db = readDb();
+  const ticket: Ticket = {
+    id: newId().slice(0, 8).toUpperCase(),
+    tenantId: data.tenantId,
+    botId: data.botId,
+    conversationId: data.conversationId,
+    summary: data.summary,
+    status: "open",
+    createdAt: now(),
+  };
+  db.tickets.push(ticket);
+  writeDb(db);
+  return ticket;
+}
+
+export function listTickets(tenantId?: string): Ticket[] {
+  const tickets = readDb().tickets;
+  return tenantId ? tickets.filter((t) => t.tenantId === tenantId) : tickets;
 }
 
 // --- Stats -----------------------------------------------------------------

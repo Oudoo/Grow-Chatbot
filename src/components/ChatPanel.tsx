@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { Channel, ProviderMeta } from "@/lib/types";
+import type { Channel, ProviderMeta, ToolInvocation } from "@/lib/types";
 import { IconSend } from "@/components/icons";
 
 export interface ChatLabels {
@@ -16,6 +16,7 @@ interface ChatMsg {
   role: "user" | "assistant";
   content: string;
   meta?: ProviderMeta;
+  tools?: ToolInvocation[];
   error?: boolean;
 }
 
@@ -26,6 +27,8 @@ interface ChatPanelProps {
   welcomeMessage?: string;
   labels: ChatLabels;
   showMeta?: boolean;
+  /** Resolve a tool name to a display label (defaults to the raw name). */
+  toolLabel?: (name: string) => string;
   /** Bump this value to reset the conversation from the parent. */
   resetKey?: number;
   apiBase?: string;
@@ -38,6 +41,7 @@ export function ChatPanel({
   welcomeMessage,
   labels,
   showMeta = false,
+  toolLabel = (name) => name,
   resetKey = 0,
   apiBase = "",
 }: ChatPanelProps) {
@@ -82,7 +86,12 @@ export function ChatPanel({
       setConversationId(data.conversationId);
       setMessages((m) => [
         ...m,
-        { role: "assistant", content: data.reply, meta: data.meta },
+        {
+          role: "assistant",
+          content: data.reply,
+          meta: data.meta,
+          tools: data.tools,
+        },
       ]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "error";
@@ -122,6 +131,19 @@ export function ChatPanel({
               >
                 {m.content}
               </div>
+              {m.role === "assistant" && m.tools && m.tools.length > 0 && (
+                <div className="mt-1 flex flex-wrap gap-1 px-1">
+                  {m.tools.map((inv, j) => (
+                    <span
+                      key={j}
+                      title={inv.result}
+                      className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700"
+                    >
+                      🔧 {toolLabel(inv.name)}
+                    </span>
+                  ))}
+                </div>
+              )}
               {showMeta && m.meta && (
                 <div className="mt-1 px-1 text-[11px] text-slate-400">
                   {labels.via} {m.meta.provider} · {m.meta.model} ·{" "}

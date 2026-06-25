@@ -84,6 +84,16 @@ const en = {
     deleteConfirm: "Delete this bot and all its conversations?",
     createdAt: "Created",
   },
+  tools: {
+    title: "Tools (agentic)",
+    hint: "Let this bot take real actions mid-conversation. The model decides when to call them.",
+    used: "Used",
+    labels: {
+      lookup_order: "Order lookup",
+      product_lookup: "Product lookup",
+      create_ticket: "Create support ticket",
+    },
+  },
   embed: {
     title: "Embed this bot",
     intro: "Paste this snippet before </body> on your site:",
@@ -217,6 +227,16 @@ const ar: Dict = {
     save: "حفظ البوت",
     deleteConfirm: "حذف هذا البوت وكل محادثاته؟",
     createdAt: "أُنشئ في",
+  },
+  tools: {
+    title: "الأدوات (وكيل ذكي)",
+    hint: "اسمح لهذا البوت باتخاذ إجراءات فعلية أثناء المحادثة. النموذج يقرر متى يستدعيها.",
+    used: "استخدم",
+    labels: {
+      lookup_order: "تتبّع الطلب",
+      product_lookup: "البحث عن منتج",
+      create_ticket: "إنشاء تذكرة دعم",
+    },
   },
   embed: {
     title: "ضمّن هذا البوت",

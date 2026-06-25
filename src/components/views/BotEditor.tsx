@@ -20,11 +20,13 @@ export function BotEditor({
   bot,
   providers,
   defaultProvider,
+  availableTools,
 }: {
   mode: "create" | "edit";
   bot?: Bot;
   providers: ProviderInfo[];
   defaultProvider: ProviderId;
+  availableTools: string[];
 }) {
   const { t } = useLang();
 
@@ -63,6 +65,7 @@ export function BotEditor({
         bot={bot}
         providers={providers}
         defaultProvider={defaultProvider}
+        availableTools={availableTools}
       />
 
       {mode === "edit" && bot && (

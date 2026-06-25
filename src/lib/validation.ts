@@ -7,6 +7,7 @@ import type {
   BotStatus,
 } from "@/lib/types";
 import { CHANNELS } from "@/lib/types";
+import { toolNames } from "@/lib/tools";
 
 const LANGS: Language[] = ["ar", "en"];
 const DIALECTS: Dialect[] = [
@@ -49,6 +50,11 @@ export function parseBotInput(body: unknown, tenantId: string): Parsed<NewBot> {
     temperature = 0.4;
   }
 
+  const known = new Set(toolNames());
+  const tools = Array.isArray(b.tools)
+    ? (b.tools as unknown[]).map((t) => String(t)).filter((t) => known.has(t))
+    : [];
+
   const value: NewBot = {
     tenantId,
     name,
@@ -65,6 +71,7 @@ export function parseBotInput(body: unknown, tenantId: string): Parsed<NewBot> {
     provider: pick<BotProvider>(b.provider, PROVIDERS, "default"),
     model: b.model ? String(b.model).trim() : undefined,
     temperature,
+    tools,
     status: pick<BotStatus>(b.status, STATUSES, "active"),
   };
   return { ok: true, value };

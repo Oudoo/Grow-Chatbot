@@ -36,6 +36,7 @@ export function seedIfEmpty(): void {
       "أهلاً وسهلاً في متجر نمو! 👋 كيف فيني ساعدك اليوم؟ اسألني عن المنتجات أو الشحن أو الإرجاع.",
     provider: "default",
     temperature: 0.4,
+    tools: ["lookup_order", "product_lookup", "create_ticket"],
     status: "active",
   };
 
@@ -59,6 +60,7 @@ export function seedIfEmpty(): void {
       "Hi there! 👋 I'm the Grow support bot. Ask me about plans, onboarding, or billing.",
     provider: "default",
     temperature: 0.4,
+    tools: ["create_ticket"],
     status: "active",
   };
 

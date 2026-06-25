@@ -57,7 +57,7 @@ export function buildSystemPrompt(bot: Bot): string {
   }
 
   parts.push(
-    "Be concise, friendly, and helpful. Keep answers focused on the user's question.",
+    "If a relevant tool is available, call it to fetch accurate, up-to-date information (order status, product details, ticket creation) instead of guessing. Be concise, friendly, and helpful, and keep answers focused on the user's question.",
   );
 
   return parts.join("\n\n");

@@ -1,5 +1,7 @@
 # Grow-Chatbot (Mujeeb)
 
+![CI](https://github.com/Oudoo/Grow-Chatbot/actions/workflows/ci.yml/badge.svg)
+
 An **Arabic-first conversational AI platform** — a multi-tenant chatbot builder
 with a bilingual (Arabic / English) RTL admin dashboard, a backend-switchable
 **multi-provider LLM engine**, a channel-ready API, and an **embeddable web chat
@@ -18,7 +20,13 @@ to real, knowledge-grounded AI.
   behind one `LLMProvider` interface. The provider is chosen by the **backend**
   (a global default plus a per-bot override) — never exposed to end users. If a
   selected provider has no key configured, the engine transparently falls back
-  to the mock provider so the app always responds.
+  to the mock provider so the app always responds. **Gemini is the default
+  vendor.**
+- **Agentic tool-calling.** Bots can take real actions mid-conversation
+  (`lookup_order`, `product_lookup`, `create_ticket`) through a provider-neutral
+  tool framework with a bounded agent loop. Works across Claude / OpenAI /
+  Gemini, and the mock provider **simulates** tool calls so the whole flow is
+  demoable without keys.
 - **Bilingual RTL admin.** Full Arabic ⇄ English UI with automatic
   right-to-left layout. Arabic is the default.
 - **Channel-ready API.** One channel-agnostic `POST /api/chat` endpoint serves
@@ -70,7 +78,7 @@ the platform runs without any of it.
 
 | Variable | Purpose |
 | --- | --- |
-| `LLM_PROVIDER` | Backend **global default** provider: `mock` \| `anthropic` \| `openai` \| `gemini` |
+| `LLM_PROVIDER` | Backend **global default** provider: `mock` \| `anthropic` \| `openai` \| `gemini` (default: `gemini`) |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Enable Claude |
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Enable OpenAI |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | Enable Gemini |
@@ -87,6 +95,25 @@ End users never choose a model — selection lives entirely in the backend/admin
 addressing the "single-vendor lock-in" gap by making the vendor a config switch.
 
 ---
+
+## Agentic tools
+
+Bots can call typed tools mid-conversation. Enable them per bot in the editor
+("Tools (agentic)"). The engine runs a **bounded agent loop**: the model may
+request a tool, the engine executes it, feeds the result back, and repeats until
+the model produces a final answer. Tool calls are recorded on the message and
+shown as chips in the playground and inbox.
+
+Built-in tools (deterministic stand-ins for real merchant / CRM / logistics APIs):
+
+| Tool | Does |
+| --- | --- |
+| `lookup_order` | Returns an order's status by ID |
+| `product_lookup` | Returns price / availability from a demo catalog |
+| `create_ticket` | Persists a support ticket and returns its ID |
+
+Add your own by registering a `ToolImpl` in `src/lib/tools/index.ts` — every
+provider (and the mock simulator) picks it up automatically.
 
 ## The API
 
@@ -107,9 +134,13 @@ addressing the "single-vendor lock-in" gap by making the vendor a config switch.
   "conversationId": "…",
   "reply": "…",
   "sentiment": "positive | negative | neutral",
-  "meta": { "provider": "mock", "model": "mock-1", "latencyMs": 121, "fellBack": false }
+  "meta": { "provider": "gemini", "model": "…", "latencyMs": 121, "fellBack": false, "steps": 2 },
+  "tools": [ { "name": "lookup_order", "args": { "order_id": "ORD-2231" }, "result": "…" } ]
 }
 ```
+
+`steps > 1` and a non-empty `tools` array mean the bot called one or more
+agentic tools before answering.
 
 CORS is open on this route so it can power embedded widgets and external
 channels. Other endpoints:
@@ -149,7 +180,8 @@ src/
   components/            # React UI (ChatPanel, BotForm, inbox, sidebar, i18n provider…)
   lib/
     llm/                 # provider abstraction + mock/anthropic/openai/gemini + factory
-    engine/              # prompt builder, sentiment, runChat orchestration
+    tools/               # agentic tool framework + built-in tools
+    engine/              # prompt builder, sentiment, agent loop orchestration
     store/               # file-backed repositories (swap for Postgres later)
     i18n/                # ar/en dictionaries
     types.ts             # shared domain types
@@ -159,7 +191,7 @@ public/embed.js          # drop-in widget loader
 ### Architecture in one line
 
 `channel → /api/chat → engine.processTurn → buildSystemPrompt + sentiment →
-resolveProvider(bot) → LLMProvider.chat → persist → inbox`
+agent loop ( resolveProvider(bot) → LLMProvider.chat ⇄ tools ) → persist → inbox`
 
 ---
 
@@ -167,8 +199,9 @@ resolveProvider(bot) → LLMProvider.chat → persist → inbox`
 
 This MVP is built so the strategic differentiators slot into existing seams:
 
-- **Agentic workflows** — tool/function-calling in the `LLMProvider` interface
-  and `engine` orchestration.
+- **Agentic workflows** — ✅ shipped: provider-neutral tool framework
+  (`src/lib/tools`) + bounded agent loop. Next: more built-in tools, MCP, and
+  user-defined HTTP tools.
 - **Live human handoff** — conversations already carry a `handoff` status; the
   inbox is the place for agent takeover.
 - **Native dialect NLP** — `Dialect` steering + an `analyzeSentiment` seam are

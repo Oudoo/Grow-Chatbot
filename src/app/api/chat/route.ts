@@ -62,6 +62,7 @@ export async function POST(req: Request) {
         reply: result.assistantMessage.content,
         sentiment: result.userMessage.sentiment,
         meta: result.meta,
+        tools: result.toolInvocations,
       },
       { headers: CORS },
     );

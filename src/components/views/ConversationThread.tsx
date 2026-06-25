@@ -100,6 +100,21 @@ export function ConversationThread({
                 >
                   {m.content}
                 </div>
+                {m.role === "assistant" && m.tools && m.tools.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1 px-1">
+                    {m.tools.map((inv, j) => (
+                      <span
+                        key={j}
+                        title={inv.result}
+                        className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700"
+                      >
+                        🔧{" "}
+                        {(t.tools.labels as Record<string, string>)[inv.name] ??
+                          inv.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <div className="mt-1 flex flex-wrap items-center gap-2 px-1 text-[11px] text-slate-400">
                   <span>{formatDateTime(m.createdAt)}</span>
                   {m.role === "user" && m.sentiment && (

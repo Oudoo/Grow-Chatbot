@@ -23,6 +23,7 @@ interface BotFormProps {
   bot?: Bot;
   providers: ProviderInfo[];
   defaultProvider: ProviderId;
+  availableTools: string[];
 }
 
 interface FormState {
@@ -36,6 +37,7 @@ interface FormState {
   provider: BotProvider;
   model: string;
   temperature: number;
+  tools: string[];
   status: "active" | "draft";
 }
 
@@ -53,6 +55,7 @@ export function BotForm({
   bot,
   providers,
   defaultProvider,
+  availableTools,
 }: BotFormProps) {
   const { t, dir } = useLang();
   const router = useRouter();
@@ -68,6 +71,7 @@ export function BotForm({
     provider: bot?.provider ?? "default",
     model: bot?.model ?? "",
     temperature: bot?.temperature ?? 0.4,
+    tools: bot?.tools ?? [],
     status: bot?.status ?? "active",
   });
   const [saving, setSaving] = useState(false);
@@ -78,6 +82,18 @@ export function BotForm({
     setForm((f) => ({ ...f, [key]: value }));
     setSaved(false);
   }
+
+  function toggleTool(name: string) {
+    setForm((f) => ({
+      ...f,
+      tools: f.tools.includes(name)
+        ? f.tools.filter((x) => x !== name)
+        : [...f.tools, name],
+    }));
+    setSaved(false);
+  }
+
+  const toolLabels = t.tools.labels as Record<string, string>;
 
   async function submit() {
     if (!form.name.trim()) {
@@ -246,6 +262,47 @@ export function BotForm({
           />
         </Field>
       </div>
+
+      {/* Agentic tools */}
+      {availableTools.length > 0 && (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5">
+          <h2 className="text-sm font-medium text-slate-700">
+            {t.tools.title}
+          </h2>
+          <p className="mt-1 text-xs text-slate-400">{t.tools.hint}</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {availableTools.map((name) => {
+              const checked = form.tools.includes(name);
+              return (
+                <label
+                  key={name}
+                  className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-3 py-2 text-sm transition ${
+                    checked
+                      ? "border-brand-300 bg-brand-50"
+                      : "border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleTool(name)}
+                    className="accent-brand-600"
+                  />
+                  <span className="font-medium text-slate-700">
+                    {toolLabels[name] ?? name}
+                  </span>
+                  <span
+                    dir="ltr"
+                    className="ms-auto font-mono text-[11px] text-slate-400"
+                  >
+                    {name}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="rounded-lg bg-red-50 px-4 py-2 text-sm text-red-700">

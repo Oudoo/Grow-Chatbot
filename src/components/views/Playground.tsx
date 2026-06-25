@@ -64,6 +64,9 @@ export function Playground({ bots }: { bots: Bot[] }) {
           welcomeMessage={bot.welcomeMessage}
           showMeta
           resetKey={resetKey}
+          toolLabel={(n) =>
+            (t.tools.labels as Record<string, string>)[n] ?? n
+          }
           labels={{
             placeholder: t.playground.placeholder,
             typing: t.playground.typing,
