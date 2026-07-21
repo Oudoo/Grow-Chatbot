@@ -31,10 +31,17 @@ export class AnthropicProvider implements LLMProvider {
     const body: Record<string, unknown> = {
       model,
       max_tokens: opts?.maxTokens ?? 1024,
-      temperature: opts?.temperature ?? 0.4,
       system: opts?.system,
       messages: toAnthropicMessages(messages),
     };
+    // Current-generation Claude models (Opus 4.7/4.8 and the Sonnet/Opus/Fable/
+    // Mythos 5 family) reject `temperature`/`top_p`/`top_k` with HTTP 400. Only
+    // send `temperature` to models that still accept it (Opus 4.6, Sonnet 4.6,
+    // Haiku 4.5 and earlier) — otherwise the whole request fails and the engine
+    // silently falls back to the mock provider.
+    if (acceptsTemperature(model)) {
+      body.temperature = opts?.temperature ?? 0.4;
+    }
     if (opts?.tools?.length) {
       body.tools = opts.tools.map((t) => ({
         name: t.name,
@@ -137,6 +144,18 @@ function toAnthropicMessages(messages: ChatMessage[]): AMessage[] {
   }
   flush();
   return out;
+}
+
+/**
+ * Whether a Claude model still accepts the `temperature` sampling parameter.
+ * The 5-family (Sonnet/Opus/Fable/Mythos 5) and Opus 4.7+ dropped it and now
+ * reject it with HTTP 400; Opus 4.6, Sonnet 4.6, Haiku 4.5 and earlier keep it.
+ */
+function acceptsTemperature(model: string): boolean {
+  const m = model.toLowerCase();
+  if (/claude-[a-z]+-5(\b|-)/.test(m)) return false; // *-5 family
+  if (/claude-opus-4-[7-9]/.test(m)) return false; // Opus 4.7+
+  return true;
 }
 
 async function safeText(res: Response): Promise<string> {
