@@ -43,6 +43,9 @@ to real, knowledge-grounded AI.
   bot is set to auto-dialect.
 - **Analytics dashboard.** 14-day volume, sentiment, tool usage, dialect mix,
   handoff rate, latency, and top bots — computed from the store.
+- **Voice — "Maya".** Talk to an assistant by voice in Egyptian Arabic: a
+  premium Hume EVI engine (ported from Centro) plus a key-free browser-voice
+  fallback that drives the normal chat engine.
 - **Bilingual RTL admin.** Full Arabic ⇄ English UI with automatic
   right-to-left layout. Arabic is the default.
 - **Channel-ready API.** One channel-agnostic `POST /api/chat` endpoint serves
@@ -99,6 +102,7 @@ the platform runs without any of it.
 | `OPENAI_API_KEY`, `OPENAI_MODEL` | Enable OpenAI |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | Enable Gemini |
 | `DATA_DIR` | Where the file store writes (default `./.data`) |
+| `HUME_API_KEY`, `HUME_SECRET_KEY`, `HUME_EVI_CONFIG_ID` | Enable the "Maya" (Hume EVI) voice engine; without them, voice uses the key-free browser engine |
 
 ### How provider selection works (backend-driven)
 
@@ -176,6 +180,21 @@ turn to the detected dialect; detections show in the inbox and feed analytics.
 The **Analytics** page reports 14-day volume, sentiment, tool usage, detected
 dialect mix, handoff rate, average latency, and top bots — all from the store.
 
+### Voice — Maya
+
+Talk to any assistant by voice from **Voice** in the dashboard. Two engines:
+
+- **Maya (Hume EVI)** — the premium real-time voice agent ported from Centro AI
+  Recruiter, reframed as a general Egyptian-Arabic assistant. The bot's persona
+  is injected via `sessionSettings.systemPrompt`, so no Hume-side prompt setup is
+  needed. Requires `HUME_API_KEY`, `HUME_SECRET_KEY`, `HUME_EVI_CONFIG_ID`.
+- **Browser voice (no key)** — the Web Speech API (`ar-EG` recognition + speech
+  synthesis) driving the normal `/api/chat` engine, so tools, knowledge and
+  dialect all apply. Works with zero credentials (best in Chrome).
+
+The studio auto-selects Maya when Hume is configured and falls back to browser
+voice otherwise.
+
 ## The API
 
 ### `POST /api/chat` — channel-agnostic message ingestion
@@ -219,6 +238,7 @@ channels. Other endpoints:
 | `POST /api/mcp/demo` | Built-in demo MCP server (JSON-RPC) |
 | `GET/POST /api/integrations` · `DELETE /api/integrations/:id` | Manage integrations |
 | `GET /api/providers` | Provider catalog (labels + configured flags) |
+| `GET/POST /api/hume-token` | Voice: report Hume configured status / issue an EVI token |
 | `GET /api/health` | Health + default provider |
 
 ---
@@ -279,7 +299,9 @@ This MVP is built so the strategic differentiators slot into existing seams:
   same seam.
 - **CRM / e-commerce & analytics** — ✅ shipped: connector catalog
   (Shopify/WooCommerce/Salesforce/HubSpot/Zoho) + analytics dashboard. Next:
-  voice channels and A/B testing.
+  A/B testing.
+- **Voice** — ✅ shipped: "Maya" (Hume EVI) + a key-free browser-voice fallback,
+  Egyptian-Arabic. Next: telephony (inbound/outbound) and voice-side tool calls.
 - **Data sovereignty** — the `store/` layer is a single swap point for a
   self-hosted DB; the `LLMProvider` interface accepts a self-hosted model.
 - **CRM / e-commerce integrations, voice, analytics, A/B testing** — layer onto
