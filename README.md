@@ -1,4 +1,4 @@
-# Grow-Chatbot (Mujeeb)
+# grow-bot (Mujeeb)
 
 ![CI](https://github.com/Oudoo/Grow-Chatbot/actions/workflows/ci.yml/badge.svg)
 

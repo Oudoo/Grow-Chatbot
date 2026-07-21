@@ -2,7 +2,7 @@
   "name": "grow-chatbot",
   "version": "0.1.0",
   "private": true,
-  "description": "Grow-Chatbot (Mujeeb) - Arabic-first conversational AI platform with a multi-provider LLM engine, bilingual RTL admin, channel-ready API and an embeddable web chat widget.",
+  "description": "grow-bot (Mujeeb) - Arabic-first conversational AI platform with a multi-provider LLM engine, bilingual RTL admin, channel-ready API and an embeddable web chat widget.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

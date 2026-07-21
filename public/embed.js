@@ -1,5 +1,5 @@
 /*
- * Grow-Chatbot embeddable widget loader.
+ * grow-bot embeddable widget loader.
  *
  * Usage (paste before </body>):
  *   <script src="https://YOUR_HOST/embed.js" data-bot="BOT_ID" async></script>
