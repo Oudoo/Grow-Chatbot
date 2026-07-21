@@ -21,12 +21,27 @@ export const ALL_PROVIDER_IDS: ProviderId[] = [
   "gemini",
 ];
 
-/** The backend global default, set via the LLM_PROVIDER env var. */
+/** Real (non-mock) providers, in auto-detect preference order. */
+const REAL_PROVIDERS: ProviderId[] = ["anthropic", "gemini", "openai"];
+
+/** First real provider that has credentials configured, if any. */
+function firstConfiguredProvider(): ProviderId | null {
+  for (const id of REAL_PROVIDERS) {
+    if (REGISTRY[id].isConfigured()) return id;
+  }
+  return null;
+}
+
+/**
+ * The backend global default provider. An explicit, valid LLM_PROVIDER wins;
+ * otherwise we auto-detect whichever real provider actually has a key
+ * (preferring Anthropic) so "set one key and it just works". Falls back to the
+ * mock provider only when nothing is configured.
+ */
 export function globalDefaultProvider(): ProviderId {
-  // Gemini is the house default vendor; it transparently falls back to the
-  // mock provider when no GEMINI_API_KEY is configured, so the app still runs.
-  const v = (process.env.LLM_PROVIDER || "gemini").toLowerCase();
-  return (ALL_PROVIDER_IDS as string[]).includes(v) ? (v as ProviderId) : "mock";
+  const v = (process.env.LLM_PROVIDER || "").toLowerCase();
+  if ((ALL_PROVIDER_IDS as string[]).includes(v)) return v as ProviderId;
+  return firstConfiguredProvider() ?? "mock";
 }
 
 /**
@@ -45,8 +60,9 @@ export function getProvider(id: ProviderId): LLMProvider {
 
 /**
  * Returns the provider to actually call. If the requested provider has no
- * credentials configured, transparently fall back to the mock provider so the
- * platform always responds. The `fellBack` flag is surfaced to the caller.
+ * credentials, prefer any other configured real provider — so a stray
+ * LLM_PROVIDER pointing at an unkeyed vendor still uses your real key — and only
+ * fall back to the mock provider when nothing at all is configured.
  */
 export function resolveProvider(botProvider: BotProvider): {
   provider: LLMProvider;
@@ -57,6 +73,10 @@ export function resolveProvider(botProvider: BotProvider): {
   const provider = getProvider(requested);
   if (provider.isConfigured()) {
     return { provider, requested, fellBack: false };
+  }
+  const alt = firstConfiguredProvider();
+  if (alt && alt !== requested) {
+    return { provider: REGISTRY[alt], requested: alt, fellBack: false };
   }
   return { provider: REGISTRY.mock, requested, fellBack: requested !== "mock" };
 }
