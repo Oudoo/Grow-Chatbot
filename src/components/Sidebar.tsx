@@ -45,7 +45,7 @@ export function Sidebar() {
     <aside className="flex w-60 shrink-0 flex-col border-e border-slate-200 bg-white">
       <div className="flex items-center gap-2 px-5 py-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-500 font-bold text-white">
-          {lang === "ar" ? "نمو" : "G"}
+          G
         </div>
         <div className="leading-tight">
           <div className="font-semibold text-slate-900">{t.app.full}</div>

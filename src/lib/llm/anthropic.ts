@@ -2,7 +2,7 @@ import type { LLMProvider, ChatMessage, ChatOptions, LLMResult } from "./types";
 import type { ToolCall } from "@/lib/tools/types";
 import { LLMError } from "./types";
 
-const DEFAULT_MODEL = "claude-opus-4-8";
+const DEFAULT_MODEL = "claude-sonnet-5";
 const API_URL = "https://api.anthropic.com/v1/messages";
 
 type Block =

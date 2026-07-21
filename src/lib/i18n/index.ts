@@ -8,8 +8,8 @@ export const UI_LANGUAGES: Language[] = ["ar", "en"];
 const en = {
   dir: "ltr",
   app: {
-    name: "Grow",
-    full: "Grow-Chatbot",
+    name: "grow-bot",
+    full: "grow-bot",
     tagline: "Arabic-first conversational AI platform",
   },
   nav: {
@@ -257,8 +257,8 @@ export type Dict = typeof en;
 const ar: Dict = {
   dir: "rtl",
   app: {
-    name: "نمو",
-    full: "نمو-بوت",
+    name: "grow-bot",
+    full: "grow-bot",
     tagline: "منصة ذكاء اصطناعي حواري عربية أولاً",
   },
   nav: {
