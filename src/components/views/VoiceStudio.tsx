@@ -12,21 +12,23 @@ interface VoiceBot {
   welcome: string;
 }
 
-type Engine = "maya" | "browser";
+type Engine = "maya" | "azure" | "browser";
 
 export function VoiceStudio({
   bots,
   systemPrompts,
   humeConfigured,
+  azureConfigured,
 }: {
   bots: VoiceBot[];
   systemPrompts: Record<string, string>;
   humeConfigured: boolean;
+  azureConfigured: boolean;
 }) {
   const { t } = useLang();
   const [botId, setBotId] = useState(bots[0]?.id ?? "");
   const [engine, setEngine] = useState<Engine>(
-    humeConfigured ? "maya" : "browser",
+    azureConfigured ? "azure" : humeConfigured ? "maya" : "browser",
   );
   const bot = bots.find((b) => b.id === botId) ?? bots[0];
 
@@ -59,6 +61,18 @@ export function VoiceStudio({
         </select>
 
         <div className="inline-flex overflow-hidden rounded-lg border border-slate-200">
+          {azureConfigured && (
+            <button
+              onClick={() => setEngine("azure")}
+              className={`px-3 py-2 text-sm ${
+                engine === "azure"
+                  ? "bg-brand-600 text-white"
+                  : "bg-white text-slate-600"
+              }`}
+            >
+              {t.voice.native}
+            </button>
+          )}
           <button
             onClick={() => setEngine("maya")}
             disabled={!humeConfigured}
@@ -96,6 +110,7 @@ export function VoiceStudio({
           <BrowserVoice
             botId={bot.id}
             welcome={bot.welcome}
+            azureTts={engine === "azure"}
             labels={{
               tapToTalk: t.voice.tapToTalk,
               listening: t.voice.listening,

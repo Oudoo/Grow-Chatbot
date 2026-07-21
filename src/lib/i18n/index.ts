@@ -180,6 +180,7 @@ const en = {
     subtitle: "Talk to your assistant by voice in Egyptian Arabic",
     engine: "Voice engine",
     maya: "Maya (Hume)",
+    native: "Native Egyptian (Azure)",
     browser: "Browser voice (no key)",
     mayaUnavailable:
       "Hume isn't configured — using browser voice. Set HUME_API_KEY, HUME_SECRET_KEY and HUME_EVI_CONFIG_ID to enable Maya.",
@@ -426,6 +427,7 @@ const ar: Dict = {
     subtitle: "اتكلم مع مساعدتك بالصوت باللهجة المصرية",
     engine: "محرك الصوت",
     maya: "مايا (Hume)",
+    native: "مصري أصلي (Azure)",
     browser: "صوت المتصفح (بدون مفتاح)",
     mayaUnavailable:
       "Hume مش مضبوط — بنستخدم صوت المتصفح. اضبط HUME_API_KEY و HUME_SECRET_KEY و HUME_EVI_CONFIG_ID لتفعيل مايا.",

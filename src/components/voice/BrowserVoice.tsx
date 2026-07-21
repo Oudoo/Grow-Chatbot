@@ -28,10 +28,13 @@ export function BrowserVoice({
   botId,
   welcome,
   labels,
+  azureTts = false,
 }: {
   botId: string;
   welcome?: string;
   labels: BrowserVoiceLabels;
+  /** When true, speak replies via the native Egyptian Azure voice (/api/tts). */
+  azureTts?: boolean;
 }) {
   const [supported, setSupported] = useState(true);
   const [phase, setPhase] = useState<Phase>("idle");
@@ -40,6 +43,7 @@ export function BrowserVoice({
   );
   const conversationId = useRef<string | undefined>();
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -67,7 +71,33 @@ export function BrowserVoice({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
-  function speak(text: string) {
+  async function speak(text: string) {
+    // Native Egyptian voice via Azure (server-side /api/tts) — plays MP3 audio.
+    if (azureTts) {
+      try {
+        setPhase("speaking");
+        const res = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+        if (!res.ok) throw new Error("tts failed");
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        audio.onended = () => {
+          setPhase("idle");
+          URL.revokeObjectURL(url);
+        };
+        audio.onerror = () => setPhase("idle");
+        await audio.play();
+      } catch {
+        setPhase("idle");
+      }
+      return;
+    }
+    // Fallback: the browser's built-in speech synthesis.
     try {
       const u = new SpeechSynthesisUtterance(text);
       u.lang = voiceRef.current?.lang || "ar-EG";
@@ -110,6 +140,7 @@ export function BrowserVoice({
   function listen() {
     if (phase !== "idle") {
       window.speechSynthesis?.cancel();
+      audioRef.current?.pause();
       setPhase("idle");
       return;
     }
