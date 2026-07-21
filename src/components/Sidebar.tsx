@@ -12,6 +12,7 @@ import {
   IconWrench,
   IconChart,
   IconLink,
+  IconMic,
 } from "@/components/icons";
 
 export function Sidebar() {
@@ -27,6 +28,7 @@ export function Sidebar() {
       Icon: IconChat,
     },
     { href: "/dashboard/playground", label: t.nav.playground, Icon: IconPlay },
+    { href: "/dashboard/voice", label: t.nav.voice, Icon: IconMic },
     { href: "/dashboard/tools", label: t.nav.tools, Icon: IconWrench },
     {
       href: "/dashboard/integrations",

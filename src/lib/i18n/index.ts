@@ -20,6 +20,7 @@ const en = {
     tools: "Tools",
     integrations: "Integrations",
     analytics: "Analytics",
+    voice: "Voice",
   },
   common: {
     save: "Save",
@@ -174,6 +175,28 @@ const en = {
     topBots: "Top bots",
     none: "No data yet.",
   },
+  voice: {
+    title: "Voice — Maya",
+    subtitle: "Talk to your assistant by voice in Egyptian Arabic",
+    engine: "Voice engine",
+    maya: "Maya (Hume)",
+    browser: "Browser voice (no key)",
+    mayaUnavailable:
+      "Hume isn't configured — using browser voice. Set HUME_API_KEY, HUME_SECRET_KEY and HUME_EVI_CONFIG_ID to enable Maya.",
+    persona: "Persona",
+    start: "Start",
+    end: "End call",
+    connecting: "Connecting…",
+    listening: "Listening…",
+    speaking: "Maya is speaking…",
+    thinking: "Thinking…",
+    tapToTalk: "Tap the mic and speak",
+    stopTalk: "Tap to stop",
+    unsupported:
+      "This browser can't do voice. Try Chrome, or use the Maya (Hume) engine.",
+    hint: "Tap the mic and speak in Arabic",
+    error: "Error",
+  },
   embed: {
     title: "Embed this bot",
     intro: "Paste this snippet before </body> on your site:",
@@ -245,6 +268,7 @@ const ar: Dict = {
     tools: "الأدوات",
     integrations: "التكاملات",
     analytics: "التحليلات",
+    voice: "الصوت",
   },
   common: {
     save: "حفظ",
@@ -396,6 +420,28 @@ const ar: Dict = {
     avgMsgs: "متوسط الرسائل / محادثة",
     topBots: "أبرز البوتات",
     none: "لا توجد بيانات بعد.",
+  },
+  voice: {
+    title: "الصوت — مايا",
+    subtitle: "اتكلم مع مساعدتك بالصوت باللهجة المصرية",
+    engine: "محرك الصوت",
+    maya: "مايا (Hume)",
+    browser: "صوت المتصفح (بدون مفتاح)",
+    mayaUnavailable:
+      "Hume مش مضبوط — بنستخدم صوت المتصفح. اضبط HUME_API_KEY و HUME_SECRET_KEY و HUME_EVI_CONFIG_ID لتفعيل مايا.",
+    persona: "الشخصية",
+    start: "ابدأ",
+    end: "إنهاء المكالمة",
+    connecting: "جارٍ الاتصال…",
+    listening: "بستمع…",
+    speaking: "مايا بتتكلم…",
+    thinking: "بفكر…",
+    tapToTalk: "اضغط على المايك واتكلم",
+    stopTalk: "اضغط للإيقاف",
+    unsupported:
+      "المتصفح ده مش بيدعم الصوت. جرّب كروم، أو استخدم محرك مايا (Hume).",
+    hint: "اضغط المايك واتكلم بالعربي",
+    error: "خطأ",
   },
   embed: {
     title: "ضمّن هذا البوت",
