@@ -26,9 +26,9 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { text?: string; voice?: string };
+  let body: { text?: string; voice?: string; model?: string };
   try {
-    body = (await req.json()) as { text?: string; voice?: string };
+    body = (await req.json()) as { text?: string; voice?: string; model?: string };
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const audio = await eleven.synthesize(text, body.voice);
+    const audio = await eleven.synthesize(text, body.voice, body.model);
     return new NextResponse(Buffer.from(audio), {
       headers: {
         "Content-Type": "audio/mpeg",

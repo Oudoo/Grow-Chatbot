@@ -18,6 +18,7 @@ export function elevenLabsConfigured(): boolean {
 export async function synthesize(
   text: string,
   voiceId?: string,
+  model?: string,
 ): Promise<ArrayBuffer> {
   const key = process.env.ELEVENLABS_API_KEY ?? "";
   const voice = voiceId || elevenLabsVoiceId();
@@ -38,7 +39,7 @@ export async function synthesize(
     },
     body: JSON.stringify({
       text,
-      model_id: ELEVEN_MODEL,
+      model_id: model || ELEVEN_MODEL,
       // Tuned for lively, natural conversational Egyptian delivery.
       voice_settings: {
         stability: 0.4,

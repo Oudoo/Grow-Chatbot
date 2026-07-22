@@ -104,6 +104,76 @@ export class AnthropicProvider implements LLMProvider {
   }
 }
 
+/**
+ * Stream a Claude completion, invoking `onDelta` with each text chunk as it
+ * arrives. Returns the full text once the stream ends. Used by the low-latency
+ * voice path so speech can begin on the first sentence instead of the whole
+ * reply. No tool-calling (voice replies are plain conversational text).
+ */
+export async function streamAnthropic(
+  messages: ChatMessage[],
+  opts: { system?: string; model?: string; temperature?: number; maxTokens?: number },
+  onDelta: (text: string) => void,
+): Promise<string> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) throw new LLMError("ANTHROPIC_API_KEY is not set", "anthropic");
+
+  const model = opts.model || process.env.ANTHROPIC_MODEL || DEFAULT_MODEL;
+  const body: Record<string, unknown> = {
+    model,
+    max_tokens: opts.maxTokens ?? 512,
+    system: opts.system,
+    messages: toAnthropicMessages(messages),
+    stream: true,
+  };
+  if (acceptsTemperature(model)) body.temperature = opts.temperature ?? 0.5;
+
+  const res = await fetch(API_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok || !res.body) {
+    throw new LLMError(`Anthropic error: ${await safeText(res)}`, "anthropic", res.status);
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let full = "";
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    let nl: number;
+    while ((nl = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, nl).trim();
+      buffer = buffer.slice(nl + 1);
+      if (!line.startsWith("data:")) continue;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+      try {
+        const evt = JSON.parse(payload) as {
+          type?: string;
+          delta?: { type?: string; text?: string };
+        };
+        if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
+          const t = evt.delta.text ?? "";
+          full += t;
+          onDelta(t);
+        }
+      } catch {
+        /* ignore keepalives / partial frames */
+      }
+    }
+  }
+  return full;
+}
+
 /** Map neutral messages to Anthropic's format, grouping tool results. */
 function toAnthropicMessages(messages: ChatMessage[]): AMessage[] {
   const out: AMessage[] = [];

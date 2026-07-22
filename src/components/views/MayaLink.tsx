@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ChatPanel, type ChatLabels } from "@/components/ChatPanel";
-import { BrowserVoice } from "@/components/voice/BrowserVoice";
-import { MayaVoice } from "@/components/voice/MayaVoice";
+import { MayaLive } from "@/components/voice/MayaLive";
 
 type Mode = "chat" | "voice";
 
@@ -17,38 +16,20 @@ const CHAT_LABELS: ChatLabels = {
   agentBadge: "موظف",
 };
 
-const VOICE_LABELS = {
-  tapToTalk: "اضغط للتحدث",
-  listening: "بستمع…",
-  thinking: "بفكر…",
-  speaking: "بتكلم…",
-  unsupported: "متصفحك لا يدعم المحادثة الصوتية. جرّب Chrome.",
-  stop: "اضغط للإيقاف",
-  hint: "اضغط على الميكروفون وابدأ الكلام",
-};
-
 /**
  * A clean, public, Maya-only surface: no dashboard, no bot picker, no engine
- * options — just a toggle between text chat and a voice call with Maya.
- * The voice engine is chosen automatically: native Egyptian (Azure) when
- * configured, then Hume, otherwise the key-free browser voice.
+ * options — just a toggle between text chat and a hands-free voice call.
  */
 export function MayaLink({
   botId,
   name,
   welcome,
-  systemPrompt,
-  humeConfigured,
-  azureConfigured,
 }: {
   botId: string;
   name: string;
   welcome: string;
-  systemPrompt: string;
-  humeConfigured: boolean;
-  azureConfigured: boolean;
 }) {
-  const [mode, setMode] = useState<Mode>("chat");
+  const [mode, setMode] = useState<Mode>("voice");
 
   return (
     <div
@@ -69,20 +50,20 @@ export function MayaLink({
 
         <div className="ms-auto inline-flex overflow-hidden rounded-lg bg-white/15 p-0.5 text-xs">
           <button
-            onClick={() => setMode("chat")}
-            className={`rounded-md px-3 py-1.5 transition ${
-              mode === "chat" ? "bg-white text-brand-700" : "text-white/90"
-            }`}
-          >
-            محادثة
-          </button>
-          <button
             onClick={() => setMode("voice")}
             className={`rounded-md px-3 py-1.5 transition ${
               mode === "voice" ? "bg-white text-brand-700" : "text-white/90"
             }`}
           >
             مكالمة صوتية
+          </button>
+          <button
+            onClick={() => setMode("chat")}
+            className={`rounded-md px-3 py-1.5 transition ${
+              mode === "chat" ? "bg-white text-brand-700" : "text-white/90"
+            }`}
+          >
+            محادثة
           </button>
         </div>
       </header>
@@ -96,71 +77,10 @@ export function MayaLink({
             welcomeMessage={welcome}
             labels={CHAT_LABELS}
           />
-        ) : humeConfigured && !azureConfigured ? (
-          <HumeCall systemPrompt={systemPrompt} />
         ) : (
-          <BrowserVoice
-            botId={botId}
-            welcome={welcome}
-            azureTts={azureConfigured}
-            labels={VOICE_LABELS}
-          />
+          <MayaLive botId={botId} welcome={welcome} />
         )}
       </div>
     </div>
-  );
-}
-
-/** Fetches a Hume token, then mounts the premium Maya voice. */
-function HumeCall({ systemPrompt }: { systemPrompt: string }) {
-  const [token, setToken] = useState<{ accessToken: string; configId: string } | null>(
-    null,
-  );
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    fetch("/api/hume-token", { method: "POST" })
-      .then((r) => r.json())
-      .then((d) => {
-        if (!active) return;
-        if (d.error) setError(d.error);
-        else setToken({ accessToken: d.accessToken, configId: d.configId });
-      })
-      .catch((e) => active && setError(String(e)));
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  if (error) {
-    return (
-      <div className="flex h-full items-center justify-center p-8 text-center text-sm text-red-600">
-        خطأ: {error}
-      </div>
-    );
-  }
-  if (!token) {
-    return (
-      <div className="flex h-full items-center justify-center text-sm text-slate-400">
-        جارٍ الاتصال…
-      </div>
-    );
-  }
-  return (
-    <MayaVoice
-      accessToken={token.accessToken}
-      configId={token.configId}
-      systemPrompt={systemPrompt}
-      dir="rtl"
-      labels={{
-        start: "ابدأ المكالمة",
-        end: "إنهاء",
-        connecting: "جارٍ الاتصال…",
-        listening: "بستمع…",
-        speaking: "بتكلم…",
-        error: "خطأ",
-      }}
-    />
   );
 }
