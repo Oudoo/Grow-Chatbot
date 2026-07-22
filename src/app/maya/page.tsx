@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { seedIfEmpty } from "@/lib/seed";
 import * as store from "@/lib/store";
 import { humeConfigured } from "@/lib/hume";
-import { azureConfigured } from "@/lib/azure-tts";
 import { elevenLabsConfigured } from "@/lib/elevenlabs-tts";
 import { buildSystemPrompt } from "@/lib/engine/prompt";
 import { MayaLink } from "@/components/views/MayaLink";
@@ -30,7 +29,7 @@ export default function MayaPage() {
       welcome={maya.welcomeMessage}
       systemPrompt={buildSystemPrompt(maya, "egyptian") + VOICE_HINT}
       humeConfigured={humeConfigured()}
-      azureConfigured={elevenLabsConfigured() || azureConfigured()}
+      azureConfigured={elevenLabsConfigured()}
     />
   );
 }

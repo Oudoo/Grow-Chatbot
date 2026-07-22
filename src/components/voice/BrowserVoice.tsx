@@ -71,8 +71,26 @@ export function BrowserVoice({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
 
+  // The browser's built-in speech synthesis — the always-available fallback.
+  function browserSpeak(text: string) {
+    try {
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = voiceRef.current?.lang || "ar-EG";
+      if (voiceRef.current) u.voice = voiceRef.current;
+      u.onstart = () => setPhase("speaking");
+      u.onend = () => setPhase("idle");
+      u.onerror = () => setPhase("idle");
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    } catch {
+      setPhase("idle");
+    }
+  }
+
   async function speak(text: string) {
-    // Native Egyptian voice via Azure (server-side /api/tts) — plays MP3 audio.
+    // Native Egyptian voice (server-side /api/tts: ElevenLabs or Azure) — plays
+    // MP3 audio. If it fails for any reason, fall back to the browser voice so
+    // Maya never goes silent (e.g. if the ElevenLabs free quota is exhausted).
     if (azureTts) {
       try {
         setPhase("speaking");
@@ -90,26 +108,14 @@ export function BrowserVoice({
           setPhase("idle");
           URL.revokeObjectURL(url);
         };
-        audio.onerror = () => setPhase("idle");
+        audio.onerror = () => browserSpeak(text);
         await audio.play();
       } catch {
-        setPhase("idle");
+        browserSpeak(text);
       }
       return;
     }
-    // Fallback: the browser's built-in speech synthesis.
-    try {
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = voiceRef.current?.lang || "ar-EG";
-      if (voiceRef.current) u.voice = voiceRef.current;
-      u.onstart = () => setPhase("speaking");
-      u.onend = () => setPhase("idle");
-      u.onerror = () => setPhase("idle");
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
-    } catch {
-      setPhase("idle");
-    }
+    browserSpeak(text);
   }
 
   async function handleText(text: string) {
