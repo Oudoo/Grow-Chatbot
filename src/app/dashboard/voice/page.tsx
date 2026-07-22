@@ -2,6 +2,7 @@ import { seedIfEmpty } from "@/lib/seed";
 import * as store from "@/lib/store";
 import { humeConfigured } from "@/lib/hume";
 import { azureConfigured } from "@/lib/azure-tts";
+import { elevenLabsConfigured } from "@/lib/elevenlabs-tts";
 import { buildSystemPrompt } from "@/lib/engine/prompt";
 import { VoiceStudio } from "@/components/views/VoiceStudio";
 
@@ -34,7 +35,7 @@ export default function VoicePage() {
       }))}
       systemPrompts={systemPrompts}
       humeConfigured={humeConfigured()}
-      azureConfigured={azureConfigured()}
+      azureConfigured={elevenLabsConfigured() || azureConfigured()}
     />
   );
 }
